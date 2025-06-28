@@ -40,8 +40,6 @@ export class Game extends Phaser.Scene {
         this.highScore = localStorage.getItem('highScore') || 0;
 this.highScore = localStorage.getItem('highScore') || 0;
 this.score = 0;
-
-// High score on top, then score below
 this.highScoreText = this.add.text(16, 16, 'Personal Best: ' + this.highScore, { fontsize: '32px', fill: '#fff'});
 this.scoreText = this.add.text(16, 48, 'Score: 0', { fontsize: '32px', fill: '#000'});
 
@@ -101,6 +99,7 @@ hitBomb (player, bomb){
     this.time.delayedCall(3000, () => {
         this.scene.restart();
         this.score = 0;
+        this.setText("Game Over!")
     });
 }
 
