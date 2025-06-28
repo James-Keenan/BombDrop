@@ -9,6 +9,11 @@ export class Player extends Phaser.Physics.Arcade.Sprite
         this.setBounce(0.2);
         this.setCollideWorldBounds(true);
         this.initAnimations();
+        
+        // Air jumping properties
+        this.maxJumps = 3; // Total jumps allowed (1 ground jump + 1 air jump)
+        this.jumpsRemaining = this.maxJumps;
+        this.wasOnGround = false;
 }
 
 initAnimations(){
@@ -49,9 +54,34 @@ idle(){
 }
 
 jump(){
-    if (this.body.blocked.down){
+    // Allow jumping if we have jumps remaining
+    if (this.jumpsRemaining > 0) {
         this.setVelocityY(-500);
+        this.jumpsRemaining--;
+        
+        // Optional: Make air jumps slightly weaker than ground jumps
+        if (!this.body.blocked.down) {
+            this.setVelocityY(-400); // Weaker air jump
+        }
     }
+}
+
+fastFall(){
+    // Only allow fast fall when in the air and falling (positive Y velocity)
+    if (!this.body.blocked.down && this.body.velocity.y > 0) {
+        this.setVelocityY(800); // Fast fall speed
+    }
+}
+
+// Update method to reset jumps when touching ground
+update() {
+    // Check if player just landed on the ground
+    if (this.body.blocked.down && !this.wasOnGround) {
+        this.jumpsRemaining = this.maxJumps; // Reset jumps when landing
+    }
+    
+    // Track ground state for next frame
+    this.wasOnGround = this.body.blocked.down;
 }
 
 
