@@ -98,7 +98,7 @@ hitBomb (player, bomb){
 
     player.anims.play('turn');
 
-    this.time.delayedCall(6000, () => {
+    this.time.delayedCall(3000, () => {
         this.scene.restart();
         this.score = 0;
     });
