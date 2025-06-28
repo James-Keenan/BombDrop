@@ -86,7 +86,7 @@ export class Game extends Phaser.Scene {
 
         player.anims.play('turn');
 
-        this.time.delayedCall(6000, () => {
+        this.time.delayedCall(10000, () => {
             this.scene.restart();
         });
     }
