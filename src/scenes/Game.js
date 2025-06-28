@@ -16,7 +16,7 @@ export class Game extends Phaser.Scene {
         this.platforms.create(600, 830, "ground").setScale(3).refreshBody();
 
         
-        this.platforms.create(800, 500, 'ground').setScale(.7, 0.3).refreshBody();
+        this.platforms.create(450, 420, 'ground').setScale(.4, 0.3).refreshBody();
         this.platforms.create(900, 300, 'ground').setScale(1.2, 0.3).refreshBody();
         this.platforms.create(-150, 100, 'ground').setScale(1, 0.3).refreshBody(); //top left
         this.platforms.create(700, 600, 'ground').setScale(1, 0.3).refreshBody();
@@ -30,6 +30,12 @@ export class Game extends Phaser.Scene {
         
         // Add SPACE key for barrier activation
         this.cursors.space = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+        
+        // Add T key for time freeze activation
+        this.cursors.timeFreeze = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.T);
+        
+        // Add E key for EMP activation
+        this.cursors.emp = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.E);
 
         // Create stars with random positions and movement
         this.createMovingStars();
@@ -48,7 +54,7 @@ export class Game extends Phaser.Scene {
         this.levelScoreIncrement = 500; // Points between levels
 
         // Lives system
-        this.lives = 2; // Starting lives
+        this.lives = 3; // Starting lives
         this.nextExtraLife = 200; // Score needed for next extra life
         this.extraLifeIncrement = 200; // Starting increment amount
         this.incrementIncrease = 50; // How much more each subsequent life costs
@@ -58,6 +64,11 @@ export class Game extends Phaser.Scene {
         this.scoreText = this.add.text(16, 48, 'Score: 0', { fontSize: '24px', fill: '#fff'});
         this.livesText = this.add.text(600, 16, 'Lives: ' + this.lives, { fontSize: '32px', fill: '#ff0000'}).setOrigin(0.5, 0);
         this.levelText = this.add.text(1184, 16, 'Level: ' + this.currentLevel, { fontsize: '32px', fill: '#00ff00'}).setOrigin(1, 0);
+        
+        // Track barrier and time freeze key states
+        this.timeFreezeKeyPressed = false;
+        this.barrierKeyPressed = false;
+        this.empKeyPressed = false;
 
         this.bombs = this.physics.add.group();
 
@@ -75,6 +86,12 @@ export class Game extends Phaser.Scene {
         
         // Create barrier UI elements (initially hidden)
         this.createBarrierUI();
+        
+        // Create time freeze UI elements (initially hidden)
+        this.createTimeFreezeUI();
+        
+        // Create EMP UI elements (initially hidden)
+        this.createEMPUI();
 
         // Release the first bomb immediately when the game starts
         this.releasedBomb();
@@ -117,13 +134,43 @@ export class Game extends Phaser.Scene {
             this.barrierKeyPressed = false;
         }
         
+        // Handle time freeze activation with T key (only when unlocked)
+        if (this.cursors.timeFreeze.isDown && !this.timeFreezeKeyPressed) {
+            if (this.player.activateTimeFreeze()) {
+                this.timeFreezeKeyPressed = true;
+            }
+        } else if (!this.cursors.timeFreeze.isDown) {
+            this.timeFreezeKeyPressed = false;
+        }
+        
+        // Handle EMP activation with E key (only when unlocked and available)
+        if (this.cursors.emp.isDown && !this.empKeyPressed) {
+            if (this.player.activateEMP(this.bombs)) {
+                this.empKeyPressed = true;
+            }
+        } else if (!this.cursors.emp.isDown) {
+            this.empKeyPressed = false;
+        }
+        
         // Update barrier UI
         this.updateBarrierUI();
+        
+        // Update time freeze UI
+        this.updateTimeFreezeUI();
+        
+        // Update EMP UI
+        this.updateEMPUI();
+        
+        // Update EMP UI
+        this.updateEMPUI();
         
         // Apply magnetic force to bombs when barrier is active
         if (this.player.barrierActive) {
             this.player.applyMagneticForce(this.bombs);
         }
+        
+        // Apply star magnet effect
+        this.player.applyStarMagnet(this.stars);
 
         // Add dynamic flying behavior to stars only at level 3+
         if (this.currentLevel >= 3) {
@@ -168,6 +215,9 @@ export class Game extends Phaser.Scene {
 
         this.score += 9;
         this.scoreText.setText('score: ' + this.score);
+        
+        // Track star collection for EMP charging
+        this.player.collectStar();
 
         // Check for extra life
         if (this.score >= this.nextExtraLife) {
@@ -215,6 +265,20 @@ export class Game extends Phaser.Scene {
             this.currentLevel++;
             this.levelText.setText('Level: ' + this.currentLevel);
             
+            // Award tokens for completing the level
+            const tokensEarned = this.currentLevel <= 2 ? 1 : 2; // 1 token for levels 1-2, then 2 tokens
+            this.player.earnTokens(tokensEarned);
+            this.updateTokenUI();
+            
+            // Award special token every 5 levels
+            if (this.currentLevel % 5 === 0) {
+                this.player.earnSpecialToken();
+                this.updateTokenUI();
+                
+                // Show special token notification
+                this.showSpecialTokenNotification();
+            }
+            
             // Pause the game for level-up notifications
             this.physics.pause();
             this.input.keyboard.enabled = false;
@@ -222,99 +286,8 @@ export class Game extends Phaser.Scene {
             // Apply level changes first
             this.applyLevelChanges();
             
-            // Update player abilities based on new level
-            this.player.updateJumpAbilities(this.currentLevel);
-            
-            // Create upgrade notification text that stays longer
-            let upgradeLines = [
-                'LEVEL ' + this.currentLevel + ' REACHED!',
-                '',
-                'DIFFICULTY INCREASED:',
-                '• Bombs are faster',
-                '• Higher gravity'
-            ];
-            
-            // Add level-specific upgrades
-            if (this.currentLevel >= 3) {
-                upgradeLines.push('• More bombs spawn');
-                upgradeLines.push('• Stars now fly around!');
-            }
-            
-            if (this.currentLevel === 2) {
-                upgradeLines.splice(3, 0, '', 'NEW ABILITY UNLOCKED:', '• Double jump available!', '');
-            }
-            
-            if (this.currentLevel === 3) {
-                upgradeLines.splice(3, 0, '', 'NEW ABILITY UNLOCKED:', '• Fast fall available!', '• Press DOWN while falling', '');
-            }
-            
-            if (this.currentLevel === 4) {
-                upgradeLines.splice(3, 0, '', 'NEW ABILITY UNLOCKED:', '• Triple jump available!', '');
-            }
-            
-            if (this.currentLevel === 5) {
-                upgradeLines.splice(3, 0, '', 'NEW ABILITY UNLOCKED:', '• Magnetic barrier pushes bombs away!', '• Press SPACE to activate', '');
-            }
-            
-            upgradeLines.push('', 'More stars to collect!');
-            
-            let upgradeText = this.add.text(600, 300, upgradeLines.join('\n'), {
-                fontFamily: 'Arial Black',
-                fontSize: 36,
-                color: '#ffffff',
-                stroke: '#000000',
-                strokeThickness: 5,
-                align: 'center'
-            }).setOrigin(0.5);
-            
-            // Show "Get Ready!" countdown after longer pause
-            this.time.delayedCall(6000, () => {
-                let getReadyText = this.add.text(600, 400, 'GET READY!', {
-                    fontFamily: 'Arial Black',
-                    fontSize: 48,
-                    color: '#ffff00',
-                    stroke: '#000000',
-                    strokeThickness: 4
-                }).setOrigin(0.5);
-                
-                // Remove the upgrade text and show get ready
-                upgradeText.destroy();
-                
-                this.tweens.add({
-                    targets: getReadyText,
-                    alpha: 0,
-                    duration: 1500,
-                    ease: 'Power2',
-                    onComplete: () => {
-                        getReadyText.destroy();
-                        
-                        // Resume game after countdown
-                        this.physics.resume();
-                        this.input.keyboard.enabled = true;
-                        
-                        // Clear all cursor key states to prevent automatic movement
-                        this.cursors.left.isDown = false;
-                        this.cursors.right.isDown = false;
-                        this.cursors.up.isDown = false;
-                        this.cursors.down.isDown = false;
-                        this.cursors.space.isDown = false;
-                        
-                        // Reset barrier key state
-                        this.barrierKeyPressed = false;
-                        this.jumpKeyPressed = false;
-                        
-                        // Increase number of stars based on level for more challenge
-                        let numStars = Math.min(12 + Math.floor(this.currentLevel / 2), 20); // Max 20 stars
-                        
-                        // Respawn stars for the new level
-                        for (let i = 0; i < numStars; i++) {
-                            this.createFlyingStar();
-                        }
-
-                        this.releasedBomb();
-                    }
-                });
-            });
+            // Show upgrade menu instead of old ability choice
+            this.showUpgradeMenu();
         }
 
     }
@@ -443,7 +416,11 @@ hitBomb (player, bomb){
         const levelSpeedMultiplier = this.currentLevel * 30;
         const bombSpeed = baseSpeed + levelSpeedMultiplier;
         
-        bomb.setVelocity(Phaser.Math.Between(-bombSpeed, bombSpeed), 20);
+        // Apply slow bombs stat (permanent effect)
+        const slowFactor = this.player.getBombSlowFactor();
+        const finalBombSpeed = bombSpeed * slowFactor;
+        
+        bomb.setVelocity(Phaser.Math.Between(-finalBombSpeed, finalBombSpeed), 20 * slowFactor);
         
         // Add extra bombs at higher levels
         if (this.currentLevel >= 3) {
@@ -469,7 +446,11 @@ hitBomb (player, bomb){
         const levelSpeedMultiplier = this.currentLevel * 30;
         const bombSpeed = baseSpeed + levelSpeedMultiplier;
         
-        bomb.setVelocity(Phaser.Math.Between(-bombSpeed, bombSpeed), 20);
+        // Apply slow bombs stat (permanent effect)
+        const slowFactor = this.player.getBombSlowFactor();
+        const finalBombSpeed = bombSpeed * slowFactor;
+        
+        bomb.setVelocity(Phaser.Math.Between(-finalBombSpeed, finalBombSpeed), 20 * slowFactor);
     }
 
     createMovingStars() {
@@ -604,6 +585,517 @@ hitBomb (player, bomb){
         this.barrierBarBg.setVisible(visible);
         this.barrierBarFill.setVisible(visible);
         this.barrierInstruction.setVisible(visible);
+    }
+    
+    // Update token UI
+    updateTokenUI() {
+        // Token UI is hidden during gameplay, only shown in upgrade menu
+    }
+    
+    // Create time freeze UI
+    createTimeFreezeUI() {
+        // Time freeze UI - positioned on the right side
+        this.timeFreezeLabel = this.add.text(1184, 80, 'Time Freeze:', { fontSize: '20px', fill: '#88ccff'}).setOrigin(1, 0);
+        
+        // Time freeze charge bar background
+        this.timeFreezeBarBg = this.add.rectangle(1184, 110, 200, 20, 0x333333);
+        this.timeFreezeBarBg.setOrigin(1, 0.5);
+        this.timeFreezeBarBg.setStrokeStyle(2, 0x88ccff);
+        
+        // Time freeze charge bar fill
+        this.timeFreezeBarFill = this.add.rectangle(1182, 110, 196, 16, 0x88ccff);
+        this.timeFreezeBarFill.setOrigin(1, 0.5);
+        
+        // Time freeze instruction text
+        this.timeFreezeInstruction = this.add.text(1184, 130, 'Press T to activate', { fontSize: '14px', fill: '#ffffff'}).setOrigin(1, 0);
+        
+        // Initially hide time freeze UI
+        this.setTimeFreezeUIVisible(false);
+    }
+    
+    updateTimeFreezeUI() {
+        if (this.player.abilityRanks.timeFreeze < 1) {
+            this.setTimeFreezeUIVisible(false);
+            return;
+        }
+        
+        this.setTimeFreezeUIVisible(true);
+        
+        // Update charge bar
+        const chargePercent = this.player.timeFreezeCharge / this.player.timeFreezeMaxCharge;
+        this.timeFreezeBarFill.scaleX = chargePercent;
+        
+        // Change color based on charge level
+        if (chargePercent >= 1.0) {
+            this.timeFreezeBarFill.setFillStyle(0x00ff00); // Green when ready
+            this.timeFreezeLabel.setColor('#00ff00');
+            this.timeFreezeInstruction.setText('Press T to activate');
+        } else if (this.player.timeFreezeActive) {
+            this.timeFreezeBarFill.setFillStyle(0xffff00); // Yellow when active
+            this.timeFreezeLabel.setColor('#ffff00');
+            this.timeFreezeInstruction.setText('TIME FROZEN!');
+        } else {
+            this.timeFreezeBarFill.setFillStyle(0xff4444); // Red when charging
+            this.timeFreezeLabel.setColor('#ff4444');
+            this.timeFreezeInstruction.setText('Recharging...');
+        }
+    }
+    
+    setTimeFreezeUIVisible(visible) {
+        if (!this.timeFreezeLabel) {
+            this.createTimeFreezeUI();
+        }
+        this.timeFreezeLabel.setVisible(visible);
+        this.timeFreezeBarBg.setVisible(visible);
+        this.timeFreezeBarFill.setVisible(visible);
+        this.timeFreezeInstruction.setVisible(visible);
+    }
+    
+    // Create EMP UI
+    createEMPUI() {
+        // EMP UI - positioned below time freeze
+        this.empLabel = this.add.text(1184, 160, 'EMP:', { fontSize: '20px', fill: '#ffff00'}).setOrigin(1, 0);
+        
+        // EMP charge bar background
+        this.empBarBg = this.add.rectangle(1184, 190, 200, 20, 0x333333);
+        this.empBarBg.setOrigin(1, 0.5);
+        this.empBarBg.setStrokeStyle(2, 0xffff00);
+        
+        // EMP charge bar fill
+        this.empBarFill = this.add.rectangle(1182, 190, 196, 16, 0xffff00);
+        this.empBarFill.setOrigin(1, 0.5);
+        
+        // EMP instruction text
+        this.empInstructionText = this.add.text(1184, 210, 'Press E to activate', { fontSize: '16px', fill: '#cccccc'}).setOrigin(1, 0);
+        
+        // Hide UI initially (will be shown when unlocked)
+        this.empLabel.setVisible(false);
+        this.empBarBg.setVisible(false);
+        this.empBarFill.setVisible(false);
+        this.empInstructionText.setVisible(false);
+    }
+    
+    // Update EMP UI
+    updateEMPUI() {
+        if (this.player.empUnlocked) {
+            // Show EMP UI elements
+            this.empLabel.setVisible(true);
+            this.empBarBg.setVisible(true);
+            this.empBarFill.setVisible(true);
+            this.empInstructionText.setVisible(true);
+            
+            // Update charge bar based on stars collected
+            const chargePercentage = Math.min(this.player.starsCollected / this.player.starsNeededForEMP, 1);
+            this.empBarFill.scaleX = chargePercentage;
+            
+            // Update text based on availability
+            if (this.player.empAvailable) {
+                this.empLabel.setText('EMP: READY');
+                this.empLabel.setTint(0x00ff00);
+                this.empBarFill.setFillStyle(0x00ff00);
+                this.empInstructionText.setText('Press E to activate');
+            } else {
+                this.empLabel.setText(`EMP: ${this.player.starsCollected}/${this.player.starsNeededForEMP}`);
+                this.empLabel.setTint(0xffff00);
+                this.empBarFill.setFillStyle(0xffff00);
+                this.empInstructionText.setText('Collect stars to charge');
+            }
+        } else {
+            // Hide EMP UI elements when not unlocked
+            this.empLabel.setVisible(false);
+            this.empBarBg.setVisible(false);
+            this.empBarFill.setVisible(false);
+            this.empInstructionText.setVisible(false);
+        }
+    }
+
+    showUpgradeMenu() {
+        // Create upgrade menu background
+        let menuBackground = this.add.rectangle(600, 400, 1100, 650, 0x000000, 0.9);
+        
+        // Title with level info
+        let title = this.add.text(600, 120, `LEVEL ${this.currentLevel} COMPLETE!`, {
+            fontFamily: 'Arial Black',
+            fontSize: 36,
+            color: '#ffff00',
+            stroke: '#000000',
+            strokeThickness: 4
+        }).setOrigin(0.5);
+        
+        // Tokens earned notification
+        const tokensEarned = this.currentLevel <= 2 ? 1 : 2;
+        let tokensEarnedText = this.add.text(600, 160, `+${tokensEarned} Token${tokensEarned > 1 ? 's' : ''} Earned!`, {
+            fontFamily: 'Arial Black',
+            fontSize: 24,
+            color: '#ffff00',
+            stroke: '#000000',
+            strokeThickness: 3
+        }).setOrigin(0.5);
+        
+        // Current tokens display
+        let currentTokensText = this.add.text(600, 200, `Tokens: ${this.player.tokens}  Special: ${this.player.specialTokens}`, {
+            fontFamily: 'Arial Black',
+            fontSize: 20,
+            color: '#ffffff'
+        }).setOrigin(0.5);
+        
+        // Section headers
+        let regularHeader = this.add.text(300, 250, 'REGULAR UPGRADES', {
+            fontFamily: 'Arial Black',
+            fontSize: 24,
+            color: '#ffff00',
+            stroke: '#000000',
+            strokeThickness: 3
+        }).setOrigin(0.5);
+        
+        let premiumHeader = this.add.text(900, 250, '★ PREMIUM UPGRADES ★', {
+            fontFamily: 'Arial Black',
+            fontSize: 24,
+            color: '#ff00ff',
+            stroke: '#000000',
+            strokeThickness: 3
+        }).setOrigin(0.5);
+        
+        // Store UI elements for cleanup
+        this.upgradeMenuElements = [menuBackground, title, tokensEarnedText, currentTokensText, regularHeader, premiumHeader];
+        
+        // Create upgrade cards
+        this.createUpgradeCards();
+        
+        // Create continue button and ESC instruction
+        this.createContinueButton();
+        
+        // Add ESC key listener
+        this.escKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
+        this.escKey.on('down', () => {
+            this.closeUpgradeMenu();
+        });
+    }
+    
+    createUpgradeCards() {
+        const regularUpgrades = [
+            { name: 'jump', title: this.player.getJumpUpgradeName(), icon: '⬆', x: 150, y: 350 },
+            { name: 'speed', title: this.player.getSpeedUpgradeName(), icon: '»', x: 300, y: 350 },
+            { name: 'fastFall', title: 'Fast Fall', icon: '⬇', x: 450, y: 350 },
+            { name: 'slowBombs', title: this.player.getSlowBombsUpgradeName(), icon: '🐌', x: 150, y: 500 },
+            { name: 'starMagnet', title: this.player.getStarMagnetUpgradeName(), icon: '🧲', x: 300, y: 500 }
+        ];
+        
+        const premiumUpgrades = [
+            { name: 'barrier', title: 'Barrier', icon: '⦿', x: 750, y: 350 },
+            { name: 'timeFreeze', title: 'Time Freeze', icon: '⏰', x: 900, y: 350 },
+            { name: 'emp', title: 'EMP', icon: '⚡', x: 1050, y: 350 }
+        ];
+        
+        // Create regular upgrade cards
+        regularUpgrades.forEach(upgrade => {
+            this.createUpgradeCard(upgrade, false);
+        });
+        
+        // Create premium upgrade cards
+        premiumUpgrades.forEach(upgrade => {
+            this.createUpgradeCard(upgrade, true);
+        });
+    }
+    
+    createUpgradeCard(upgrade, isPremium) {
+        const currentRank = this.player.abilityRanks[upgrade.name];
+        const maxRank = this.player.getMaxRank(upgrade.name);
+        const canUpgrade = this.player.canUpgrade(upgrade.name);
+        const cost = this.player.getUpgradeCost(upgrade.name, currentRank);
+        
+        // Card background
+        const cardWidth = 120;
+        const cardHeight = 120;
+        let card = this.add.rectangle(upgrade.x, upgrade.y, cardWidth, cardHeight, canUpgrade ? 0x004488 : 0x333333, 1);
+        card.setStrokeStyle(3, isPremium ? 0xff00ff : 0x00ffff);
+        
+        if (canUpgrade) {
+            card.setInteractive();
+        }
+        
+        // Icon
+        let icon = this.add.text(upgrade.x, upgrade.y - 30, upgrade.icon, {
+            fontFamily: 'Arial Black',
+            fontSize: 28,
+            color: '#ffffff'
+        }).setOrigin(0.5);
+        
+        // Title
+        let title = this.add.text(upgrade.x, upgrade.y - 5, upgrade.title, {
+            fontFamily: 'Arial Black',
+            fontSize: 12,
+            color: '#ffffff'
+        }).setOrigin(0.5);
+        
+        // Rank display
+        let rankText = `${currentRank}/${maxRank}`;
+        if (currentRank >= maxRank) rankText = 'MAX';
+        
+        let rank = this.add.text(upgrade.x, upgrade.y + 15, rankText, {
+            fontFamily: 'Arial Black',
+            fontSize: 10,
+            color: currentRank >= maxRank ? '#00ff00' : '#ffffff'
+        }).setOrigin(0.5);
+        
+        // Cost display
+        let costText = '';
+        if (currentRank >= maxRank) {
+            costText = 'MAXED';
+        } else if (!canUpgrade) {
+            if (cost.specialTokens > 0) {
+                costText = `${cost.tokens}T + ${cost.specialTokens}S`;
+            } else {
+                costText = `${cost.tokens}T`;
+            }
+        } else {
+            if (cost.specialTokens > 0) {
+                costText = `${cost.tokens}T + ${cost.specialTokens}S`;
+            } else {
+                costText = `${cost.tokens}T`;
+            }
+        }
+        
+        let costColor = '#cccccc';
+        if (currentRank >= maxRank) costColor = '#00ff00';
+        else if (canUpgrade) costColor = isPremium ? '#ff00ff' : '#ffff00';
+        else costColor = '#ff4444';
+        
+        let costDisplay = this.add.text(upgrade.x, upgrade.y + 35, costText, {
+            fontFamily: 'Arial',
+            fontSize: 10,
+            color: costColor
+        }).setOrigin(0.5);
+        
+        // Premium star indicator
+        if (isPremium) {
+            let star = this.add.text(upgrade.x + 45, upgrade.y - 45, '★', {
+                fontFamily: 'Arial Black',
+                fontSize: 16,
+                color: '#ff00ff'
+            }).setOrigin(0.5);
+            this.upgradeMenuElements.push(star);
+        }
+        
+        // Store elements
+        this.upgradeMenuElements.push(card, icon, title, rank, costDisplay);
+        
+        // Button interactions
+        if (canUpgrade) {
+            card.on('pointerover', () => {
+                card.setFillStyle(0x0066aa);
+            });
+            
+            card.on('pointerout', () => {
+                card.setFillStyle(0x004488);
+            });
+            
+            card.on('pointerdown', () => {
+                this.purchaseUpgrade(upgrade.name);
+            });
+        }
+    }
+    
+    purchaseUpgrade(abilityName) {
+        if (this.player.upgradeAbility(abilityName)) {
+            // Update token display
+            this.updateTokenUI();
+            
+            // Refresh the upgrade menu to show new state
+            this.refreshUpgradeMenu();
+            
+            // Show upgrade effect
+            this.showUpgradeEffect(abilityName);
+        }
+    }
+    
+    refreshUpgradeMenu() {
+        // Remove only the upgrade cards, keep the background and headers
+        const elementsToKeep = 6; // background, title, tokens earned, current tokens, 2 headers
+        while (this.upgradeMenuElements.length > elementsToKeep) {
+            const element = this.upgradeMenuElements.pop();
+            if (element && element.destroy) {
+                element.destroy();
+            }
+        }
+        
+        // Recreate the cards
+        this.createUpgradeCards();
+        
+        // Recreate continue button and ESC instruction
+        this.createContinueButton();
+        
+        // Update current tokens display
+        this.upgradeMenuElements[3].setText(`Tokens: ${this.player.tokens}  Special: ${this.player.specialTokens}`);
+    }
+    
+    createContinueButton() {
+        // Add Continue button
+        let continueButton = this.add.rectangle(600, 680, 200, 50, 0x00aa00, 1);
+        continueButton.setStrokeStyle(3, 0x00ff00);
+        continueButton.setInteractive();
+        
+        let continueButtonText = this.add.text(600, 680, 'CONTINUE', {
+            fontFamily: 'Arial Black',
+            fontSize: 20,
+            color: '#ffffff'
+        }).setOrigin(0.5);
+        
+        // Add ESC to continue instruction
+        let continueText = this.add.text(600, 720, 'Press ESC to continue without upgrading', {
+            fontFamily: 'Arial',
+            fontSize: 18,
+            color: '#cccccc'
+        }).setOrigin(0.5);
+        
+        this.upgradeMenuElements.push(continueButton, continueButtonText, continueText);
+        
+        // Continue button interactions
+        continueButton.on('pointerover', () => {
+            continueButton.setFillStyle(0x00cc00);
+        });
+        
+        continueButton.on('pointerout', () => {
+            continueButton.setFillStyle(0x00aa00);
+        });
+        
+        continueButton.on('pointerdown', () => {
+            this.closeUpgradeMenu();
+        });
+    }
+    
+    showUpgradeEffect(abilityName) {
+        let upgradeDisplayName;
+        
+        if (abilityName === 'jump') {
+            // Get the actual jump upgrade name based on the new rank
+            const jumpRank = this.player.abilityRanks.jump;
+            if (jumpRank === 1) upgradeDisplayName = 'Double Jump';
+            else if (jumpRank === 2) upgradeDisplayName = 'Triple Jump';
+            else if (jumpRank === 3) upgradeDisplayName = 'Quad Jump';
+            else upgradeDisplayName = 'Jump';
+        } else if (abilityName === 'speed') {
+            // Get the actual speed upgrade name based on the new rank
+            const speedRank = this.player.abilityRanks.speed;
+            if (speedRank === 1) upgradeDisplayName = 'Super Speed I';
+            else if (speedRank === 2) upgradeDisplayName = 'Super Speed II';
+            else if (speedRank === 3) upgradeDisplayName = 'Super Speed III';
+            else upgradeDisplayName = 'Super Speed';
+        } else if (abilityName === 'slowBombs') {
+            // Get the actual slow bombs upgrade name based on the new rank
+            const slowBombsRank = this.player.abilityRanks.slowBombs;
+            const tierNames = ['Slow Bombs I', 'Slow Bombs II', 'Slow Bombs III', 'Slow Bombs IV'];
+            upgradeDisplayName = tierNames[slowBombsRank - 1] || 'Slow Bombs';
+        } else if (abilityName === 'starMagnet') {
+            // Get the actual star magnet upgrade name based on the new rank
+            const starMagnetRank = this.player.abilityRanks.starMagnet;
+            const tierNames = ['Star Magnet I', 'Star Magnet II', 'Star Magnet III', 'Star Magnet IV'];
+            upgradeDisplayName = tierNames[starMagnetRank - 1] || 'Star Magnet';
+        } else {
+            const abilityNames = {
+                'fastFall': 'Fast Fall',
+                'barrier': 'Barrier',
+                'timeFreeze': 'Time Freeze',
+                'emp': 'EMP'
+            };
+            upgradeDisplayName = abilityNames[abilityName];
+        }
+        
+        let effectText = this.add.text(600, 600, `${upgradeDisplayName} UPGRADED!`, {
+            fontFamily: 'Arial Black',
+            fontSize: 24,
+            color: '#00ff00',
+            stroke: '#000000',
+            strokeThickness: 3
+        }).setOrigin(0.5);
+        
+        this.upgradeMenuElements.push(effectText);
+        
+        // Fade out after 1 second
+        this.time.delayedCall(1000, () => {
+            if (effectText) {
+                this.tweens.add({
+                    targets: effectText,
+                    alpha: 0,
+                    duration: 500,
+                    onComplete: () => {
+                        if (effectText && effectText.destroy) {
+                            effectText.destroy();
+                        }
+                    }
+                });
+            }
+        });
+    }
+    
+    closeUpgradeMenu() {
+        // Clean up all upgrade menu elements
+        if (this.upgradeMenuElements) {
+            this.upgradeMenuElements.forEach(element => {
+                if (element && element.destroy) {
+                    element.destroy();
+                }
+            });
+            this.upgradeMenuElements = [];
+        }
+        
+        // Remove ESC key listener
+        if (this.escKey) {
+            this.escKey.removeAllListeners();
+            this.input.keyboard.removeKey(this.escKey);
+            this.escKey = null;
+        }
+        
+        // Continue to level
+        this.continueLevelAfterUpgrade();
+    }
+    
+    continueLevelAfterUpgrade() {
+        // Show "Get Ready!" countdown
+        let getReadyText = this.add.text(600, 400, 'GET READY!', {
+            fontFamily: 'Arial Black',
+            fontSize: 48,
+            color: '#ffff00',
+            stroke: '#000000',
+            strokeThickness: 4
+        }).setOrigin(0.5);
+        
+        this.tweens.add({
+            targets: getReadyText,
+            alpha: 0,
+            duration: 1500,
+            ease: 'Power2',
+            onComplete: () => {
+                getReadyText.destroy();
+                
+                // Resume game after countdown
+                this.physics.resume();
+                this.input.keyboard.enabled = true;
+                
+                // Clear all cursor key states to prevent automatic movement
+                this.cursors.left.isDown = false;
+                this.cursors.right.isDown = false;
+                this.cursors.up.isDown = false;
+                this.cursors.down.isDown = false;
+                this.cursors.space.isDown = false;
+                this.cursors.timeFreeze.isDown = false;
+                
+                // Reset key states
+                this.barrierKeyPressed = false;
+                this.jumpKeyPressed = false;
+                this.timeFreezeKeyPressed = false;
+                
+                // Increase number of stars based on level for more challenge
+                let numStars = Math.min(12 + Math.floor(this.currentLevel / 2), 20); // Max 20 stars
+                
+                // Respawn stars for the new level
+                for (let i = 0; i < numStars; i++) {
+                    this.createFlyingStar();
+                }
+
+                this.releasedBomb();
+            }
+        });
     }
 
 }
