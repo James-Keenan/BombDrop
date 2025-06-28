@@ -262,16 +262,20 @@ export class Game extends Phaser.Scene {
 
         if (this.stars.countActive(true) === 0){
             // Level up when all stars are collected!
+            console.log('Level up triggered, current level:', this.currentLevel);
             this.currentLevel++;
             this.levelText.setText('Level: ' + this.currentLevel);
+            console.log('New level:', this.currentLevel);
             
             // Award tokens for completing the level
             const tokensEarned = this.currentLevel <= 2 ? 1 : 2; // 1 token for levels 1-2, then 2 tokens
+            console.log('Tokens earned:', tokensEarned);
             this.player.earnTokens(tokensEarned);
             this.updateTokenUI();
             
             // Award special token every 5 levels
             if (this.currentLevel % 5 === 0) {
+                console.log('Special token earned at level:', this.currentLevel);
                 this.player.earnSpecialToken();
                 this.updateTokenUI();
                 
@@ -284,9 +288,11 @@ export class Game extends Phaser.Scene {
             this.input.keyboard.enabled = false;
             
             // Apply level changes first
+            console.log('Applying level changes for level:', this.currentLevel);
             this.applyLevelChanges();
             
             // Show upgrade menu instead of old ability choice
+            console.log('Showing upgrade menu for level:', this.currentLevel);
             this.showUpgradeMenu();
         }
 
@@ -709,7 +715,36 @@ hitBomb (player, bomb){
         }
     }
 
+    showSpecialTokenNotification() {
+        let specialTokenText = this.add.text(600, 300, 'SPECIAL TOKEN EARNED!', {
+            fontFamily: 'Arial Black',
+            fontSize: 32,
+            color: '#ff00ff',
+            stroke: '#000000',
+            strokeThickness: 4
+        }).setOrigin(0.5);
+        
+        // Fade out after 2 seconds
+        this.time.delayedCall(2000, () => {
+            if (specialTokenText) {
+                this.tweens.add({
+                    targets: specialTokenText,
+                    alpha: 0,
+                    duration: 500,
+                    onComplete: () => {
+                        if (specialTokenText && specialTokenText.destroy) {
+                            specialTokenText.destroy();
+                        }
+                    }
+                });
+            }
+        });
+    }
+
     showUpgradeMenu() {
+        console.log('showUpgradeMenu called for level:', this.currentLevel);
+        console.log('Player tokens:', this.player.tokens, 'Special tokens:', this.player.specialTokens);
+        
         // Create upgrade menu background
         let menuBackground = this.add.rectangle(600, 400, 1100, 650, 0x000000, 0.9);
         
@@ -759,9 +794,11 @@ hitBomb (player, bomb){
         // Store UI elements for cleanup
         this.upgradeMenuElements = [menuBackground, title, tokensEarnedText, currentTokensText, regularHeader, premiumHeader];
         
+        console.log('About to create upgrade cards...');
         // Create upgrade cards
         this.createUpgradeCards();
         
+        console.log('About to create continue button...');
         // Create continue button and ESC instruction
         this.createContinueButton();
         
@@ -770,9 +807,13 @@ hitBomb (player, bomb){
         this.escKey.on('down', () => {
             this.closeUpgradeMenu();
         });
+        
+        console.log('showUpgradeMenu completed successfully');
     }
     
     createUpgradeCards() {
+        console.log('createUpgradeCards called');
+        
         const regularUpgrades = [
             { name: 'jump', title: this.player.getJumpUpgradeName(), icon: '⬆', x: 150, y: 350 },
             { name: 'speed', title: this.player.getSpeedUpgradeName(), icon: '»', x: 300, y: 350 },
@@ -781,21 +822,31 @@ hitBomb (player, bomb){
             { name: 'starMagnet', title: this.player.getStarMagnetUpgradeName(), icon: '🧲', x: 300, y: 500 }
         ];
         
+        console.log('Regular upgrades defined:', regularUpgrades);
+        
         const premiumUpgrades = [
             { name: 'barrier', title: 'Barrier', icon: '⦿', x: 750, y: 350 },
             { name: 'timeFreeze', title: 'Time Freeze', icon: '⏰', x: 900, y: 350 },
             { name: 'emp', title: 'EMP', icon: '⚡', x: 1050, y: 350 }
         ];
         
+        console.log('Premium upgrades defined:', premiumUpgrades);
+        
         // Create regular upgrade cards
-        regularUpgrades.forEach(upgrade => {
+        console.log('Creating regular upgrade cards...');
+        regularUpgrades.forEach((upgrade, index) => {
+            console.log(`Creating regular card ${index}:`, upgrade.name, upgrade.title);
             this.createUpgradeCard(upgrade, false);
         });
         
         // Create premium upgrade cards
-        premiumUpgrades.forEach(upgrade => {
+        console.log('Creating premium upgrade cards...');
+        premiumUpgrades.forEach((upgrade, index) => {
+            console.log(`Creating premium card ${index}:`, upgrade.name, upgrade.title);
             this.createUpgradeCard(upgrade, true);
         });
+        
+        console.log('createUpgradeCards completed successfully');
     }
     
     createUpgradeCard(upgrade, isPremium) {
