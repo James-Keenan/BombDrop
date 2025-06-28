@@ -8,14 +8,15 @@ export class GameOver extends Phaser.Scene {
         this.cameras.main.setBackgroundColor(0x2c1810);
 
         // Add the sky background with reduced alpha
-        this.add.image(400, 300, 'sky').setAlpha(0.3);
+        let bg = this.add.image(600, 400, 'sky').setAlpha(0.3);
+        bg.setScale(1200 / bg.width, 800 / bg.height);
 
         // Get the final score from the registry
         const finalScore = this.registry.get('finalScore') || 0;
         const highScore = localStorage.getItem('highScore') || 0;
 
         // Game Over title
-        this.add.text(400, 200, 'Game Over', {
+        this.add.text(600, 250, 'Game Over', {
             fontFamily: 'Arial Black', 
             fontSize: 64, 
             color: '#ff4444',
@@ -25,7 +26,7 @@ export class GameOver extends Phaser.Scene {
         }).setOrigin(0.5);
 
         // Score display
-        this.add.text(400, 280, 'Final Score: ' + finalScore, {
+        this.add.text(600, 330, 'Final Score: ' + finalScore, {
             fontFamily: 'Arial', 
             fontSize: 32, 
             color: '#ffffff',
@@ -35,7 +36,7 @@ export class GameOver extends Phaser.Scene {
         }).setOrigin(0.5);
 
         // High score display
-        this.add.text(400, 320, 'Personal Best: ' + highScore, {
+        this.add.text(600, 370, 'Personal Best: ' + highScore, {
             fontFamily: 'Arial', 
             fontSize: 24, 
             color: '#ffff00',
@@ -45,14 +46,14 @@ export class GameOver extends Phaser.Scene {
         }).setOrigin(0.5);
 
         // Instructions
-        this.add.text(400, 420, 'Press SPACE to Play Again', {
+        this.add.text(600, 470, 'Press SPACE to Play Again', {
             fontFamily: 'Arial', 
             fontSize: 24, 
             color: '#ffffff',
             align: 'center'
         }).setOrigin(0.5);
 
-        this.add.text(400, 450, 'Press ESC to Return to Menu', {
+        this.add.text(600, 500, 'Press ESC to Return to Menu', {
             fontFamily: 'Arial', 
             fontSize: 18, 
             color: '#cccccc',

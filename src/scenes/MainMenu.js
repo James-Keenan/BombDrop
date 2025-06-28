@@ -13,10 +13,11 @@ export class MainMenu extends Phaser.Scene {
         this.children.removeAll();
 
         // Add background
-        this.add.image(400, 300, 'sky');
+        let bg = this.add.image(600, 400, 'sky');
+        bg.setScale(1200 / bg.width, 800 / bg.height);
 
         // Game title
-        this.add.text(400, 150, 'BombDrop', {
+        this.add.text(600, 200, 'BombDrop', {
             fontFamily: 'Arial Black',
             fontSize: 72,
             color: '#ffffff',
@@ -26,7 +27,7 @@ export class MainMenu extends Phaser.Scene {
         }).setOrigin(0.5);
 
         // Subtitle
-        this.add.text(400, 200, 'Avoid the Bombs, Collect the Stars!', {
+        this.add.text(600, 250, 'Avoid the Bombs, Collect the Stars!', {
             fontFamily: 'Arial',
             fontSize: 24,
             color: '#ffff00',
@@ -36,17 +37,17 @@ export class MainMenu extends Phaser.Scene {
         }).setOrigin(0.5);
 
         // Menu buttons
-        this.createButton(400, 300, 'START GAME', '#ff4444', () => {
+        this.createButton(600, 350, 'START GAME', '#ff4444', () => {
             this.scene.start('Game');
         });
 
-        this.createButton(400, 360, 'HOW TO PLAY', '#00ff00', () => {
+        this.createButton(600, 410, 'HOW TO PLAY', '#00ff00', () => {
             this.showRules();
         });
 
         // Display high score directly on main menu
         const highScore = localStorage.getItem('highScore') || 0;
-        this.add.text(400, 420, 'Personal Best: ' + highScore, {
+        this.add.text(600, 470, 'Personal Best: ' + highScore, {
             fontFamily: 'Arial',
             fontSize: 24,
             color: '#ffff00',
@@ -117,10 +118,11 @@ export class MainMenu extends Phaser.Scene {
         this.children.removeAll();
 
         // Add background
-        this.add.image(400, 300, 'sky').setAlpha(0.7);
+        let bg = this.add.image(600, 400, 'sky').setAlpha(0.7);
+        bg.setScale(1200 / bg.width, 800 / bg.height);
 
         // Rules title
-        this.add.text(400, 80, 'HOW TO PLAY', {
+        this.add.text(600, 100, 'HOW TO PLAY', {
             fontFamily: 'Arial Black',
             fontSize: 48,
             color: '#00ff00',
@@ -133,25 +135,30 @@ export class MainMenu extends Phaser.Scene {
         const rulesText = [
             'CONTROLS:',
             '• Use ARROW KEYS to move left and right',
-            '• Press UP to jump (triple jump available!)',
-            '• Press DOWN while falling to drop faster',
+            '• Press UP to jump (double jump unlocks at level 2!)',
+            '• Press DOWN while falling to drop faster (unlocks at level 3!)',
+            '• Press SPACE for magnetic barrier (unlocks at level 5!)',
             '',
             'GAMEPLAY:',
-            '• Collect all stars to clear the level',
+            '• Collect all stars to advance to the next level',
             '• Avoid the bouncing bombs at all costs!',
-            '• New bombs appear after clearing all stars',
+            '• More stars and bombs appear at higher levels',
             '',
-            'SCORING:',
-            '• Each star = 10 points',
-            '• Extra life at 300 points, then every 400+ points',
-            '• Start with 1 life, earn more by scoring high!',
+            'PROGRESSION:',
+            '• Level 2: Double jump unlocked!',
+            '• Level 3: Fast fall & flying stars!',
+            '• Level 4: Triple jump unlocked!',
+            '• Level 5: Magnetic barrier unlocked!',
+            '• Higher levels: Faster bombs, more stars',
+            '• Each star = 9 points',
             '',
             'LIVES:',
+            '• Extra life every 200+ points (cost increases)',
             '• You get temporary invincibility after being hit',
             '• Game over when all lives are lost'
         ];
 
-        let yPos = 120;
+        let yPos = 140;
         rulesText.forEach(rule => {
             if (rule === '') {
                 yPos += 8; // Extra spacing for empty lines
@@ -159,7 +166,7 @@ export class MainMenu extends Phaser.Scene {
                 const textColor = rule.endsWith(':') ? '#ffff00' : '#ffffff';
                 const fontSize = rule.endsWith(':') ? 14 : 14;
                 
-                this.add.text(400, yPos, rule, {
+                this.add.text(600, yPos, rule, {
                     fontFamily: rule.endsWith(':') ? 'Arial Black' : 'Arial',
                     fontSize: fontSize,
                     color: textColor,
@@ -172,7 +179,7 @@ export class MainMenu extends Phaser.Scene {
         });
 
         // Back button - moved higher now that text is more compact
-        this.createButton(400, 520, 'BACK TO MENU', '#ff4444', () => {
+        this.createButton(600, 600, 'BACK TO MENU', '#ff4444', () => {
             this.createMainMenu();
         });
 
@@ -187,8 +194,8 @@ export class MainMenu extends Phaser.Scene {
     addDecorativeStars() {
         // Add some animated stars for decoration
         const starPositions = [
-            {x: 100, y: 100}, {x: 700, y: 120}, {x: 150, y: 500}, 
-            {x: 650, y: 480}, {x: 50, y: 300}, {x: 750, y: 350}
+            {x: 150, y: 120}, {x: 1050, y: 140}, {x: 200, y: 650}, 
+            {x: 1000, y: 630}, {x: 100, y: 400}, {x: 1100, y: 450}
         ];
 
         starPositions.forEach(pos => {
