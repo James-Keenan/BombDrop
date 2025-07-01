@@ -38,8 +38,11 @@ export class Game extends Phaser.Scene {
 
         this.cursors = this.input.keyboard.createCursorKeys();
         
-        // Add SPACE key for barrier activation
+        // Add SPACE key for jumping
         this.cursors.space = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+        
+        // Add W key for barrier activation
+        this.cursors.barrier = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W);
         
         // Add E key for EMP activation
         this.cursors.emp = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.E);
@@ -53,6 +56,8 @@ export class Game extends Phaser.Scene {
         this.physics.add.collider(this.stars, this.platforms);
         this.physics.add.overlap(this.player, this.stars, this.collectStar, null, this);
 
+        // Clear old version data - version 3.0 introduces major gameplay changes
+        this.clearOldVersionData();
         
         this.highScore = localStorage.getItem('highScore') || 0;
         // Reset score to 0 when starting a new game
@@ -73,7 +78,6 @@ export class Game extends Phaser.Scene {
         // High score on top left, score below it, lives in top middle, level in top right
         this.highScoreText = this.add.text(16, 16, 'Personal Best: ' + this.highScore, { fontsize: '32px', fill: '#fff'});
         this.scoreText = this.add.text(16, 48, 'Score: 0', { fontSize: '24px', fill: '#fff'});
-        this.starValueText = this.add.text(16, 75, 'Star Value: ' + this.player.getStarScoreValue(), { fontSize: '20px', fill: '#ffff00'});
         this.livesText = this.add.text(725, 16, 'Lives: ' + this.lives, { fontSize: '32px', fill: '#ff0000'}).setOrigin(0.5, 0);
         this.levelText = this.add.text(1434, 16, 'Level: ' + this.currentLevel, { fontsize: '32px', fill: '#00ff00'}).setOrigin(1, 0);
         
@@ -144,11 +148,11 @@ export class Game extends Phaser.Scene {
             this.player.idle();
         }
 
-        // Handle jump input - only jump on key press, not while held
-        if (this.cursors.up.isDown && !this.jumpKeyPressed) {
+        // Handle jump input - only jump on key press, not while held (UP arrow or SPACE)
+        if ((this.cursors.up.isDown || this.cursors.space.isDown) && !this.jumpKeyPressed) {
             this.player.jump();
             this.jumpKeyPressed = true;
-        } else if (!this.cursors.up.isDown) {
+        } else if (!this.cursors.up.isDown && !this.cursors.space.isDown) {
             this.jumpKeyPressed = false;
         }
 
@@ -157,12 +161,12 @@ export class Game extends Phaser.Scene {
             this.player.fastFall();
         }
         
-        // Handle barrier activation with SPACE key (only when unlocked)
-        if (this.cursors.space.isDown && !this.barrierKeyPressed) {
+        // Handle barrier activation with W key (only when unlocked)
+        if (this.cursors.barrier.isDown && !this.barrierKeyPressed) {
             if (this.player.activateBarrier()) {
                 this.barrierKeyPressed = true;
             }
-        } else if (!this.cursors.space.isDown) {
+        } else if (!this.cursors.barrier.isDown) {
             this.barrierKeyPressed = false;
         }
         
@@ -209,8 +213,7 @@ export class Game extends Phaser.Scene {
         this.score += scoreEarned;
         this.scoreText.setText('score: ' + this.score);
         
-        // Update star value UI
-        this.starValueText.setText('Star Value: ' + this.player.getStarScoreValue());
+
         
         // Track star collection for EMP charging (pass the actual points earned)
         this.player.collectStar(scoreEarned);
@@ -516,7 +519,7 @@ hitBomb (player, bomb){
         this.barrierBarFill.setOrigin(0, 0.5);
         
         // Barrier instruction text
-        this.barrierInstruction = this.add.text(16, 920, 'Press SPACE to activate', { fontSize: '14px', fill: '#ffffff'});
+        this.barrierInstruction = this.add.text(16, 920, 'Press W to activate', { fontSize: '14px', fill: '#ffffff'});
         
         // Initially hide barrier UI
         this.setBarrierUIVisible(false);
@@ -538,7 +541,7 @@ hitBomb (player, bomb){
         if (chargePercent >= 1.0) {
             this.barrierBarFill.setFillStyle(0x00ff00); // Green when ready
             this.barrierLabel.setColor('#00ff00');
-            this.barrierInstruction.setText('Press SPACE to activate');
+            this.barrierInstruction.setText('Press W to activate');
         } else if (this.player.barrierActive) {
             this.barrierBarFill.setFillStyle(0xffff00); // Yellow when active
             this.barrierLabel.setColor('#ffff00');
@@ -997,11 +1000,6 @@ hitBomb (player, bomb){
             // Update token display
             this.updateTokenUI();
             
-            // Update star value display if star multiplier was upgraded
-            if (abilityName === 'starMultiplier') {
-                this.starValueText.setText('Star Value: ' + this.player.getStarScoreValue());
-            }
-            
             // Refresh the upgrade menu to show new state
             this.refreshUpgradeMenu();
             
@@ -1099,10 +1097,10 @@ hitBomb (player, bomb){
         } else if (abilityName === 'starMultiplier') {
             // Get the actual star multiplier upgrade name based on the new rank
             const starMultiplierRank = this.player.abilityRanks.starMultiplier;
-            if (starMultiplierRank === 1) upgradeDisplayName = 'Star Value +11';
-            else if (starMultiplierRank === 2) upgradeDisplayName = 'Star Value +13';
-            else if (starMultiplierRank === 3) upgradeDisplayName = 'Star Value +15';
-            else upgradeDisplayName = 'Star Value';
+            if (starMultiplierRank === 1) upgradeDisplayName = 'Star Multiplier x1.1';
+            else if (starMultiplierRank === 2) upgradeDisplayName = 'Star Multiplier x1.3';
+            else if (starMultiplierRank === 3) upgradeDisplayName = 'Star Multiplier x1.5';
+            else upgradeDisplayName = 'Star Multiplier';
         } else if (abilityName === 'platformDrop') {
             // Get the actual platform drop upgrade name based on the new rank
             const platformDropRank = this.player.abilityRanks.platformDrop;
@@ -1207,6 +1205,7 @@ hitBomb (player, bomb){
                 this.cursors.up.isDown = false;
                 this.cursors.down.isDown = false;
                 this.cursors.space.isDown = false;
+                this.cursors.barrier.isDown = false;
                 
                 // Reset key states
                 this.barrierKeyPressed = false;
@@ -1310,7 +1309,7 @@ hitBomb (player, bomb){
                 desc: `Attracts nearby stars automatically. Current: ${currentRank === 0 ? 'No attraction' : `${[80, 100, 130, 170, 220][currentRank-1]} range`}. Next: ${currentRank >= 5 ? 'MAX' : `${[80, 100, 130, 170, 220][currentRank]} range`}`
             },
             starMultiplier: {
-                title: 'Star Value Boost',
+                title: 'Star Multiplier',
                 desc: `Increases points per star collected. Current: ${[9, 11, 13, 15][currentRank]} points per star. Next: ${currentRank >= 3 ? 'MAX' : `${[9, 11, 13, 15][currentRank + 1]} points per star`}`
             },
             extraLife: {
@@ -1319,7 +1318,7 @@ hitBomb (player, bomb){
             },
             barrier: {
                 title: 'Energy Barrier',
-                desc: `Blocks bombs temporarily (SPACE key). Charges with 110 star points. Current: ${currentRank === 0 ? 'Locked' : currentRank === 1 ? '4s duration' : currentRank === 2 ? '6s duration' : '8s duration'}. ${currentRank >= 3 ? 'MAX' : 'Next: Longer duration'}`
+                desc: `Blocks bombs temporarily (W key). Charges with 110 star points. Current: ${currentRank === 0 ? 'Locked' : currentRank === 1 ? '4s duration' : currentRank === 2 ? '6s duration' : '8s duration'}. ${currentRank >= 3 ? 'MAX' : 'Next: Longer duration'}`
             },
             emp: {
                 title: 'EMP Blast',
@@ -1452,5 +1451,88 @@ hitBomb (player, bomb){
                 this.lifeRegenLabel.setColor('#ffffff');
             }
         }
+    }
+
+    // Clear old version data - ensures fresh start for new version
+    clearOldVersionData() {
+        const CURRENT_VERSION = '3.0';
+        const storedVersion = localStorage.getItem('gameVersion');
+        
+        // If no version is stored or it's different from current version, clear old data
+        if (!storedVersion || storedVersion !== CURRENT_VERSION) {
+            console.log('New version detected! Clearing old data for fresh start...');
+            
+            // Clear all game-related localStorage items
+            localStorage.removeItem('highScore');
+            localStorage.removeItem('highestLevel');
+            localStorage.removeItem('playerData');
+            localStorage.removeItem('abilities');
+            localStorage.removeItem('tokens');
+            localStorage.removeItem('specialTokens');
+            localStorage.removeItem('upgrades');
+            localStorage.removeItem('stars');
+            localStorage.removeItem('lives');
+            localStorage.removeItem('level');
+            localStorage.removeItem('score');
+            
+            // Set the new version
+            localStorage.setItem('gameVersion', CURRENT_VERSION);
+            
+            console.log('Old data cleared! Starting fresh with version', CURRENT_VERSION);
+            
+            // Show version update notification
+            this.showVersionUpdateNotification();
+        }
+    }
+    
+    // Show notification that the game has been updated
+    showVersionUpdateNotification() {
+        // Create notification background
+        let notificationBg = this.add.rectangle(725, 200, 600, 120, 0x000000, 0.95);
+        notificationBg.setStrokeStyle(3, 0x00ff00);
+        notificationBg.setDepth(2000);
+        
+        // Title
+        let title = this.add.text(725, 170, 'GAME UPDATED!', {
+            fontFamily: 'Arial Black',
+            fontSize: 28,
+            color: '#00ff00',
+            stroke: '#000000',
+            strokeThickness: 3
+        }).setOrigin(0.5);
+        title.setDepth(2001);
+        
+        // Message
+        let message = this.add.text(725, 200, 'Welcome to BombDrop v3.0!\nYour progress has been reset for the new version.', {
+            fontFamily: 'Arial',
+            fontSize: 16,
+            color: '#ffffff',
+            align: 'center'
+        }).setOrigin(0.5);
+        message.setDepth(2001);
+        
+        // Subtext
+        let subtext = this.add.text(725, 235, 'New features: Life Regen, balanced abilities, improved gameplay!', {
+            fontFamily: 'Arial',
+            fontSize: 12,
+            color: '#ffff00'
+        }).setOrigin(0.5);
+        subtext.setDepth(2001);
+        
+        // Auto-hide after 5 seconds
+        this.time.delayedCall(5000, () => {
+            this.tweens.add({
+                targets: [notificationBg, title, message, subtext],
+                alpha: 0,
+                duration: 1000,
+                ease: 'Power2',
+                onComplete: () => {
+                    notificationBg.destroy();
+                    title.destroy();
+                    message.destroy();
+                    subtext.destroy();
+                }
+            });
+        });
     }
 }
