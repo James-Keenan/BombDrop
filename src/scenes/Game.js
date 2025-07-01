@@ -350,13 +350,13 @@ hitBomb (player, bomb){
         console.log('Player still has lives:', this.lives, '- continuing game');
         player.setTint(0xff0000);
         
-        // Flash effect with longer duration for better visibility
+        // Flash effect for 2 seconds of invincibility
         this.tweens.add({
             targets: player,
             alpha: 0.3,
-            duration: 150,
+            duration: 100,
             yoyo: true,
-            repeat: 20, // Even longer invincibility period
+            repeat: 19, // 2 seconds total (100ms * 2 * 10 cycles = 2000ms)
             onComplete: () => {
                 player.setTint(0xffffff); // Reset to normal color
                 player.alpha = 1;
@@ -426,31 +426,44 @@ hitBomb (player, bomb){
     }
 
     createFlyingStar() {
-        // Define safe spawn areas to avoid platforms including moving platform
+        // Define safe spawn areas to avoid platforms and ensure proper spacing
         let x, y;
         let attempts = 0;
-        let maxAttempts = 20;
+        let maxAttempts = 30;
+        const minDistanceFromOtherStars = 240; // Minimum distance between stars
         
         do {
-            x = Phaser.Math.Between(50, 1400);
-            y = Phaser.Math.Between(50, 350); // Keep stars in upper area to avoid most platforms
+            x = Phaser.Math.Between(80, 1370); // Slightly more inset from edges
+            y = Phaser.Math.Between(60, 340); // Keep stars in upper area to avoid most platforms
             attempts++;
             
+            let validPosition = true;
+            
             // Check if position conflicts with known platform positions
-            let tooClose = false;
-            
             // Check against moving platform area (it moves between x=300-516, y=399)
-            if (x >= 280 && x <= 536 && Math.abs(y - 399) < 60) tooClose = true;
+            if (x >= 260 && x <= 556 && Math.abs(y - 399) < 80) validPosition = false;
             // Check against platform at (1110, 185)
-            if (Math.abs(x - 1110) < 150 && Math.abs(y - 185) < 50) tooClose = true;
+            if (Math.abs(x - 1110) < 170 && Math.abs(y - 185) < 70) validPosition = false;
             // Check against platform at (-50, 150)
-            if (Math.abs(x - (-50)) < 100 && Math.abs(y - 150) < 50) tooClose = true;
+            if (Math.abs(x - (-50)) < 120 && Math.abs(y - 150) < 70) validPosition = false;
             // Check against platform at (700, 600) - less relevant since we spawn high
-            if (Math.abs(x - 700) < 100 && Math.abs(y - 600) < 50) tooClose = true;
+            if (Math.abs(x - 700) < 120 && Math.abs(y - 600) < 70) validPosition = false;
             // Check against platform at (181, 825) - less relevant since we spawn high
-            if (Math.abs(x - 181) < 100 && Math.abs(y - 825) < 150) tooClose = true;
+            if (Math.abs(x - 181) < 120 && Math.abs(y - 825) < 170) validPosition = false;
             
-            if (!tooClose) break;
+            // Check distance from existing stars to ensure spacing
+            if (validPosition && this.stars) {
+                this.stars.children.entries.forEach(existingStar => {
+                    if (existingStar.active) {
+                        const distance = Phaser.Math.Distance.Between(x, y, existingStar.x, existingStar.y);
+                        if (distance < minDistanceFromOtherStars) {
+                            validPosition = false;
+                        }
+                    }
+                });
+            }
+            
+            if (validPosition) break;
             
         } while (attempts < maxAttempts);
         
@@ -1086,9 +1099,9 @@ hitBomb (player, bomb){
         } else if (abilityName === 'starMultiplier') {
             // Get the actual star multiplier upgrade name based on the new rank
             const starMultiplierRank = this.player.abilityRanks.starMultiplier;
-            if (starMultiplierRank === 1) upgradeDisplayName = 'Star Value +12';
-            else if (starMultiplierRank === 2) upgradeDisplayName = 'Star Value +15';
-            else if (starMultiplierRank === 3) upgradeDisplayName = 'Star Value +18';
+            if (starMultiplierRank === 1) upgradeDisplayName = 'Star Value +11';
+            else if (starMultiplierRank === 2) upgradeDisplayName = 'Star Value +13';
+            else if (starMultiplierRank === 3) upgradeDisplayName = 'Star Value +15';
             else upgradeDisplayName = 'Star Value';
         } else if (abilityName === 'platformDrop') {
             // Get the actual platform drop upgrade name based on the new rank
@@ -1200,8 +1213,8 @@ hitBomb (player, bomb){
                 this.jumpKeyPressed = false;
                 this.sonicBoomKeyPressed = false;
                 
-                // Increase number of stars based on level for more challenge
-                let numStars = Math.min(12 + Math.floor(this.currentLevel / 2), 20); // Max 20 stars
+                // Always spawn the same number of stars (12) for consistency
+                const numStars = 12;
                 
                 // Respawn stars for the new level
                 for (let i = 0; i < numStars; i++) {
@@ -1290,15 +1303,15 @@ hitBomb (player, bomb){
             },
             slowBombs: {
                 title: 'Slow Bombs',
-                desc: `Permanently slows bomb movement. Current: ${currentRank === 0 ? 'Normal bombs' : `${Math.round((1 - [0.75, 0.55, 0.35, 0.20, 0.10][currentRank-1]) * 100)}% slower`}. Next: ${currentRank >= 5 ? 'MAX' : `${Math.round((1 - [0.75, 0.55, 0.35, 0.20, 0.10][currentRank]) * 100)}% slower`}`
+                desc: `Permanently slows bomb movement. Current: ${currentRank === 0 ? 'Normal bombs' : `${Math.round((1 - [0.85, 0.70, 0.55, 0.40, 0.25][currentRank-1]) * 100)}% slower`}. Next: ${currentRank >= 5 ? 'MAX' : `${Math.round((1 - [0.85, 0.70, 0.55, 0.40, 0.25][currentRank]) * 100)}% slower`}`
             },
             starMagnet: {
                 title: 'Star Magnet',
-                desc: `Attracts nearby stars automatically. Current: ${currentRank === 0 ? 'No attraction' : `${[100, 135, 175, 225, 300][currentRank-1]} range`}. Next: ${currentRank >= 5 ? 'MAX' : `${[100, 135, 175, 225, 300][currentRank]} range`}`
+                desc: `Attracts nearby stars automatically. Current: ${currentRank === 0 ? 'No attraction' : `${[80, 100, 130, 170, 220][currentRank-1]} range`}. Next: ${currentRank >= 5 ? 'MAX' : `${[80, 100, 130, 170, 220][currentRank]} range`}`
             },
             starMultiplier: {
                 title: 'Star Value Boost',
-                desc: `Increases points per star collected. Current: ${[9, 12, 15, 18][currentRank]} points per star. Next: ${currentRank >= 3 ? 'MAX' : `${[9, 12, 15, 18][currentRank + 1]} points per star`}`
+                desc: `Increases points per star collected. Current: ${[9, 11, 13, 15][currentRank]} points per star. Next: ${currentRank >= 3 ? 'MAX' : `${[9, 11, 13, 15][currentRank + 1]} points per star`}`
             },
             extraLife: {
                 title: 'Extra Life',
@@ -1306,11 +1319,11 @@ hitBomb (player, bomb){
             },
             barrier: {
                 title: 'Energy Barrier',
-                desc: `Blocks bombs temporarily (SPACE key). Charges with 90 star points. Current: ${currentRank === 0 ? 'Locked' : currentRank === 1 ? '5s duration' : currentRank === 2 ? '7s duration' : '10s duration'}. ${currentRank >= 3 ? 'MAX' : 'Next: Longer duration'}`
+                desc: `Blocks bombs temporarily (SPACE key). Charges with 110 star points. Current: ${currentRank === 0 ? 'Locked' : currentRank === 1 ? '4s duration' : currentRank === 2 ? '6s duration' : '8s duration'}. ${currentRank >= 3 ? 'MAX' : 'Next: Longer duration'}`
             },
             emp: {
                 title: 'EMP Blast',
-                desc: `Destroys all bombs (E key). Requires ${[500, 450, 400][Math.min(currentRank, 2)]} star points. Current: ${currentRank === 0 ? 'Locked' : `${[8, 6, 4][currentRank-1]}s delay`}. ${currentRank >= 3 ? 'MAX' : 'Next: Faster recharge'}`
+                desc: `Destroys all bombs (E key). Requires ${[600, 550, 500][Math.min(currentRank, 2)]} star points. Current: ${currentRank === 0 ? 'Locked' : `${[8, 6, 4][currentRank-1]}s delay`}. ${currentRank >= 3 ? 'MAX' : 'Next: Faster recharge'}`
             },
             platformDrop: {
                 title: 'Platform Phasing',
@@ -1322,11 +1335,11 @@ hitBomb (player, bomb){
             },
             sonicBoom: {
                 title: 'Sonic Boom',
-                desc: `Throw pulse grenade to destroy bombs (Q key). Recharges every 600 points. Current: ${currentRank === 0 ? 'Locked' : currentRank === 1 ? 'Destroy 1 bomb per charge' : currentRank === 2 ? 'Destroy 2 bombs per charge' : 'Destroy 3 bombs per charge'}. ${currentRank >= 3 ? 'MAX' : `Next: ${currentRank === 0 ? 'Destroy 1 bomb' : currentRank === 1 ? 'Destroy 2 bombs' : 'Destroy 3 bombs'} per charge`}`
+                desc: `Throw pulse grenade to destroy bombs (Q key). Recharges every 900 points. Current: ${currentRank === 0 ? 'Locked' : currentRank === 1 ? 'Destroy 1 bomb per charge' : currentRank === 2 ? 'Destroy 2 bombs per charge' : 'Destroy 3 bombs per charge'}. ${currentRank >= 3 ? 'MAX' : `Next: ${currentRank === 0 ? 'Destroy 1 bomb' : currentRank === 1 ? 'Destroy 2 bombs' : 'Destroy 3 bombs'} per charge`}`
             },
             lifeRegen: {
                 title: 'Life Regen',
-                desc: `Regenerate lives by collecting star points. Current: ${currentRank === 0 ? 'Locked' : `${325 - ((currentRank - 1) * 25)} points needed per life`}. ${currentRank >= 5 ? 'MAX' : `Next: ${currentRank === 0 ? '325 points per life' : `${325 - (currentRank * 25)} points per life`}`}`
+                desc: `Regenerate lives by collecting star points. Current: ${currentRank === 0 ? 'Locked' : `${375 - ((currentRank - 1) * 25)} points needed per life`}. ${currentRank >= 5 ? 'MAX' : `Next: ${currentRank === 0 ? '375 points per life' : `${375 - (currentRank * 25)} points per life`}`}`
             }
         };
         
@@ -1388,8 +1401,8 @@ hitBomb (player, bomb){
         this.lifeRegenBar.setScrollFactor(0);
         this.lifeRegenBar.setDepth(1001);
         
-        // Label for the meter
-        this.lifeRegenLabel = this.add.text(lifeRegenX, lifeRegenY - 2, 'LIFE REGEN', {
+        // Label for the meter - positioned to the left of the progress bar
+        this.lifeRegenLabel = this.add.text(lifeRegenX - 100, lifeRegenY + 11, 'LIFE REGEN', {
             fontFamily: 'Arial',
             fontSize: '10px',
             color: '#ffffff'

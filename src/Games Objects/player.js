@@ -36,11 +36,11 @@ export class Player extends Phaser.Physics.Arcade.Sprite
         // Track if increased movement speed is unlocked
         this.increasedSpeedUnlocked = false;
         this.baseMovementSpeed = 200; // Base movement speed
-        this.speedTier1 = 280; // Speed tier 1
-        this.speedTier2 = 360; // Speed tier 2
-        this.speedTier3 = 440; // Speed tier 3
-        this.speedTier4 = 520; // Speed tier 4
-        this.speedTier5 = 600; // Speed tier 5
+        this.speedTier1 = 260; // Nerfed: Speed tier 1 (reduced from 280)
+        this.speedTier2 = 320; // Nerfed: Speed tier 2 (reduced from 360)
+        this.speedTier3 = 380; // Nerfed: Speed tier 3 (reduced from 440)
+        this.speedTier4 = 440; // Nerfed: Speed tier 4 (reduced from 520)
+        this.speedTier5 = 500; // Nerfed: Speed tier 5 (reduced from 600)
         
         // Barrier ability properties (unlocks at level 3)
         this.barrierUnlocked = false;
@@ -48,8 +48,8 @@ export class Player extends Phaser.Physics.Arcade.Sprite
         this.barrierCharge = 0; // 0-100, starts empty and charges with star points
         this.barrierMaxCharge = 100;
         this.barrierPointsCollected = 0; // Track star points for barrier charging
-        this.barrierPointsNeededForCharge = 90; // Star points needed to fully charge barrier
-        this.barrierDuration = 5000; // 5 seconds (longer than before)
+        this.barrierPointsNeededForCharge = 110; // Nerfed: increased from 90 to 110
+        this.barrierDuration = 4000; // Nerfed: 4 seconds (reduced from 5)
         this.barrierCooldown = 12000; // 12 seconds to fully recharge (slower than before)
         this.barrierGraphics = null; // Will hold the barrier visual effect
         
@@ -78,7 +78,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite
         this.empUnlocked = false;
         this.empAvailable = false;
         this.starPointsCollected = 0; // Track total star points collected for EMP
-        this.starPointsNeededForEMP = 500; // Star points needed to charge EMP
+        this.starPointsNeededForEMP = 600; // Nerfed: increased from 500 to 600
         this.empDelayTier1 = 8000; // 8 seconds delay (tier 1)
         this.empDelayTier2 = 6000; // 6 seconds delay (tier 2)
         this.empDelayTier3 = 4000; // 4 seconds delay (tier 3)
@@ -88,12 +88,12 @@ export class Player extends Phaser.Physics.Arcade.Sprite
         this.sonicBoomUnlocked = false;
         this.sonicBoomAvailable = 0; // Number of sonic booms available to use
         this.sonicBoomPointsCollected = 0; // Track points for sonic boom charging
-        this.sonicBoomPointsNeededForCharge = 600; // Points needed to gain a charge
+        this.sonicBoomPointsNeededForCharge = 900; // Nerfed: increased from 750 to 900
         
         // Life Regen ability properties
         this.lifeRegenUnlocked = false;
         this.lifeRegenPointsCollected = 0; // Track points for life regeneration
-        this.lifeRegenPointsNeededForLife = 325; // Base points needed for a new life (325, 300, 275, 250, 225)
+        this.lifeRegenPointsNeededForLife = 375; // Nerfed: Base points needed for a new life (375, 350, 325, 300, 275)
     }
 
     initAnimations(){
@@ -433,25 +433,25 @@ updateAbilityProperties() {
     
     // Update barrier properties based on rank
     if (this.abilityRanks.barrier >= 2) {
-        this.barrierDuration = 7000; // Tier 2: 7 seconds duration
+        this.barrierDuration = 6000; // Nerfed: Tier 2: 6 seconds duration (reduced from 7)
         this.barrierCooldown = 10000; // Tier 2: 10 seconds cooldown (faster)
     }
     if (this.abilityRanks.barrier >= 3) {
-        this.barrierDuration = 10000; // Tier 3: 10 seconds duration
+        this.barrierDuration = 8000; // Nerfed: Tier 3: 8 seconds duration (reduced from 10)
         this.barrierCooldown = 8000; // Tier 3: 8 seconds cooldown (fastest)
     }
     
     // Update EMP properties based on rank
     if (this.abilityRanks.emp >= 2) {
-        this.starPointsNeededForEMP = 450; // Tier 2 - needs fewer star points
+        this.starPointsNeededForEMP = 550; // Nerfed: Tier 2 - needs fewer star points (increased from 450)
     }
     if (this.abilityRanks.emp >= 3) {
-        this.starPointsNeededForEMP = 400; // Tier 3 - even fewer star points needed
+        this.starPointsNeededForEMP = 500; // Nerfed: Tier 3 - even fewer star points needed (increased from 400)
     }
     
     // Update life regen properties based on rank
     if (this.abilityRanks.lifeRegen >= 1) {
-        this.lifeRegenPointsNeededForLife = 325 - ((this.abilityRanks.lifeRegen - 1) * 25); // Reduces by 25 per tier: 325, 300, 275, 250, 225
+        this.lifeRegenPointsNeededForLife = 375 - ((this.abilityRanks.lifeRegen - 1) * 25); // Nerfed: Increases by 50, now 375, 350, 325, 300, 275
     }
 }
 
@@ -566,12 +566,12 @@ update() {
 
     // Get the bomb slow factor based on upgrade level (permanent stat)
     getBombSlowFactor() {
-        const slowLevels = [1.0, 0.75, 0.55, 0.35, 0.20, 0.10]; // 0=normal, 1-5=increasingly slower and more powerful
+        const slowLevels = [1.0, 0.85, 0.70, 0.55, 0.40, 0.25]; // Nerfed: bombs are less slow now
         return slowLevels[this.abilityRanks.slowBombs] || 1.0;
     }
 
     getStarScoreValue() {
-        const scoreValues = [9, 12, 15, 18]; // 0=9 points, 1=12 points, 2=15 points, 3=18 points
+        const scoreValues = [9, 11, 13, 15]; // Nerfed: reduced from [9, 12, 15, 18]
         return scoreValues[this.abilityRanks.starMultiplier] || 9;
     }
 
@@ -614,12 +614,12 @@ getBarrierChargePercentage() {
 applyStarMagnet(stars) {
     if (this.abilityRanks.starMagnet < 1) return;
     
-    // Progressive tier system - current level 2 becomes level 4
-    const magnetRanges = [0, 100, 125, 175, 250]; // Tier 1-4 ranges (tier 4 was old tier 2)
-    const magnetForces = [0, 200, 250, 325, 400]; // Tier 1-4 forces (tier 4 was old tier 2)
+    // Nerfed: reduced ranges and forces
+    const magnetRanges = [0, 80, 100, 130, 170, 220]; // Reduced from [0, 100, 135, 175, 225, 300]
+    const magnetForces = [0, 150, 180, 220, 280, 350]; // Reduced attraction force
     
-    const magnetRange = magnetRanges[this.abilityRanks.starMagnet] || 100;
-    const magnetForce = magnetForces[this.abilityRanks.starMagnet] || 200;
+    const magnetRange = magnetRanges[this.abilityRanks.starMagnet] || 80;
+    const magnetForce = magnetForces[this.abilityRanks.starMagnet] || 150;
     
     stars.children.entries.forEach(star => {
         if (star.active) {
