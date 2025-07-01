@@ -6,8 +6,8 @@ import { MainMenu } from './scenes/MainMenu.js';
 
 const config = {
     type: Phaser.AUTO,
-    width: 1200,
-    height: 800,
+    width: 1450,
+    height: 950,
     parent: 'game-container',
     backgroundColor: '#028af8',
     physics: {

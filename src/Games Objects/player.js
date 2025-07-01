@@ -28,20 +28,29 @@ export class Player extends Phaser.Physics.Arcade.Sprite
         // Track if fast fall is unlocked
         this.fastFallUnlocked = false;
         
+        // Track if platform abilities are unlocked
+        this.platformJumpUnlocked = false; // Jump through platforms from below
+        this.platformDropUnlocked = false; // Drop through platforms with down key
+        this.platformDropAllUnlocked = false; // Drop through ground and tall walls
+        
         // Track if increased movement speed is unlocked
         this.increasedSpeedUnlocked = false;
         this.baseMovementSpeed = 200; // Base movement speed
         this.speedTier1 = 280; // Speed tier 1
         this.speedTier2 = 360; // Speed tier 2
         this.speedTier3 = 440; // Speed tier 3
+        this.speedTier4 = 520; // Speed tier 4
+        this.speedTier5 = 600; // Speed tier 5
         
         // Barrier ability properties (unlocks at level 3)
         this.barrierUnlocked = false;
         this.barrierActive = false;
-        this.barrierCharge = 100; // 0-100, starts full
+        this.barrierCharge = 0; // 0-100, starts empty and charges with star points
         this.barrierMaxCharge = 100;
-        this.barrierDuration = 3000; // 3 seconds
-        this.barrierCooldown = 8000; // 8 seconds to fully recharge
+        this.barrierPointsCollected = 0; // Track star points for barrier charging
+        this.barrierPointsNeededForCharge = 90; // Star points needed to fully charge barrier
+        this.barrierDuration = 5000; // 5 seconds (longer than before)
+        this.barrierCooldown = 12000; // 12 seconds to fully recharge (slower than before)
         this.barrierGraphics = null; // Will hold the barrier visual effect
         
         // Token-based upgrade system
@@ -50,31 +59,44 @@ export class Player extends Phaser.Physics.Arcade.Sprite
         
         // Ability ranks - all start at 0 (locked)
         this.abilityRanks = {
-            jump: 0,       // 0=locked, 1=double, 2=triple, 3=quad
-            speed: 0,      // 0=locked, 1-3=speed tiers
-            fastFall: 0,   // 0=locked, 1=unlocked
+            jump: 0,       // 0=locked, 1-5=double to hexa jump
+            speed: 0,      // 0=locked, 1-5=speed tiers
+            fastFall: 0,   // 0=locked, 1-5=fast fall tiers
             barrier: 0,    // 0=locked, 1=unlocked, 2=improved
-            timeFreeze: 0, // 0=locked, 1=unlocked, 2=improved
-            slowBombs: 0,  // 0=locked, 1-4=permanent slow tiers
-            starMagnet: 0, // 0=locked, 1-4=magnetic strength tiers
-            emp: 0         // 0=locked, 1=unlocked, 2=improved
+            slowBombs: 0,  // 0=locked, 1-5=permanent slow tiers
+            starMagnet: 0, // 0=locked, 1-5=magnetic strength tiers
+            emp: 0,        // 0=locked, 1=unlocked, 2=improved
+            platformDrop: 0, // 0=locked, 1=jump through, 2=drop through, 3=drop through all
+            tokenBonus: 0, // 0=locked, 1=+2 tokens, 2=+3 tokens, 3=+4 tokens per level
+            starMultiplier: 0, // 0=locked, 1=2x score, 2=3x score, 3=4x score
+            extraLife: 0,   // 0=locked, can buy multiple times
+            sonicBoom: 0,   // 0=locked, 1=1 bomb for 1 token, 2=2 bombs for 5 tokens, 3=3 bombs for 10 tokens
+            lifeRegen: 0    // 0=locked, 1-5=regenerate lives (325, 300, 275, 250, 225 points needed)
         };
-        
-        // Time freeze ability
-        this.timeFreezeActive = false;
-        this.timeFreezeDuration = 2000; // 2 seconds base
-        this.timeFreezeCooldown = 10000; // 10 seconds base
-        this.timeFreezeCharge = 100;
-        this.timeFreezeMaxCharge = 100;
         
         // EMP ability properties
         this.empUnlocked = false;
         this.empAvailable = false;
-        this.starsCollected = 0; // Track total stars collected
-        this.starsNeededForEMP = 200; // Stars needed to charge EMP
-}
+        this.starPointsCollected = 0; // Track total star points collected for EMP
+        this.starPointsNeededForEMP = 500; // Star points needed to charge EMP
+        this.empDelayTier1 = 8000; // 8 seconds delay (tier 1)
+        this.empDelayTier2 = 6000; // 6 seconds delay (tier 2)
+        this.empDelayTier3 = 4000; // 4 seconds delay (tier 3)
+        this.empActive = false; // Track if EMP effect is active
+        
+        // Sonic Boom ability properties
+        this.sonicBoomUnlocked = false;
+        this.sonicBoomAvailable = 0; // Number of sonic booms available to use
+        this.sonicBoomPointsCollected = 0; // Track points for sonic boom charging
+        this.sonicBoomPointsNeededForCharge = 600; // Points needed to gain a charge
+        
+        // Life Regen ability properties
+        this.lifeRegenUnlocked = false;
+        this.lifeRegenPointsCollected = 0; // Track points for life regeneration
+        this.lifeRegenPointsNeededForLife = 325; // Base points needed for a new life (325, 300, 275, 250, 225)
+    }
 
-initAnimations(){
+    initAnimations(){
     this.anims.create({
         key: 'left',
         frames: this.anims.generateFrameNumbers('dude', { start: 0, end: 3 }),
@@ -119,84 +141,63 @@ getCurrentSpeed() {
         case 1: return this.speedTier1;
         case 2: return this.speedTier2;
         case 3: return this.speedTier3;
+        case 4: return this.speedTier4;
+        case 5: return this.speedTier5;
         default: return this.baseMovementSpeed;
     }
 }
 
 jump(){
+    console.log('Jump called - jumpRank:', this.abilityRanks.jump, 'maxJumps:', this.getMaxJumps(), 'jumpsRemaining:', this.jumpsRemaining, 'onGround:', this.body.blocked.down);
+    
     if (this.body.blocked.down) {
-        // Ground jump - always available (made weaker)
-        this.setVelocityY(-520); // Weaker ground jump (was -600)
+        // Ground jump - always available
+        this.setVelocityY(-520);
         this.jumpsRemaining = this.getMaxJumps() - 1; // Set remaining jumps after ground jump
+        console.log('Ground jump executed, jumpsRemaining set to:', this.jumpsRemaining);
     } else if (this.jumpsRemaining > 0) {
         // Air jumps based on jump rank
-        if (this.jumpsRemaining === 3 && this.abilityRanks.jump >= 3) {
-            // Second jump (double jump) - when quad jump is unlocked
-            this.setVelocityY(-520); // Strong air jump
+        const maxJumps = this.getMaxJumps();
+        
+        // Calculate which air jump this is (1st air jump, 2nd air jump, etc.)
+        const currentAirJump = maxJumps - this.jumpsRemaining; // 1st air jump = 1, 2nd air jump = 2, etc.
+        
+        console.log('Attempting air jump - currentAirJump:', currentAirJump, 'jumpRank:', this.abilityRanks.jump);
+        
+        // Jump velocities decrease with each subsequent jump
+        const jumpVelocities = [-520, -480, -440, -400, -360]; // Air jump strengths
+        const jumpColors = [0x00ffff, 0xffff00, 0xff00ff, 0x00ff00, 0xff8800]; // Visual effects
+        
+        // Check if this air jump is unlocked (rank 1 = 1 air jump, rank 2 = 2 air jumps, etc.)
+        if (currentAirJump <= 5 && this.abilityRanks.jump >= currentAirJump) {
+            this.setVelocityY(jumpVelocities[currentAirJump - 1]);
             
-            // Visual effect for double jump
-            this.setTint(0x00ffff); // Brief cyan tint
-            this.gameScene.time.delayedCall(100, () => {
+            // Visual effect
+            this.setTint(jumpColors[currentAirJump - 1]);
+            this.gameScene.time.delayedCall(100 + currentAirJump * 20, () => {
                 this.setTint(0xffffff); // Reset to normal
             });
-        } else if (this.jumpsRemaining === 2 && this.abilityRanks.jump >= 3) {
-            // Third jump (triple jump) - when quad jump is unlocked
-            this.setVelocityY(-480); // Medium air jump
             
-            // Visual effect for triple jump
-            this.setTint(0xffff00); // Brief yellow tint
-            this.gameScene.time.delayedCall(120, () => {
-                this.setTint(0xffffff); // Reset to normal
-            });
-        } else if (this.jumpsRemaining === 1 && this.abilityRanks.jump >= 3) {
-            // Fourth jump (quad jump) - final air jump
-            this.setVelocityY(-420); // Weakest air jump
-            
-            // Visual effect for quad jump
-            this.setTint(0xff00ff); // Brief magenta tint
-            this.gameScene.time.delayedCall(150, () => {
-                this.setTint(0xffffff); // Reset to normal
-            });
-        } else if (this.jumpsRemaining === 2 && this.abilityRanks.jump >= 2) {
-            // Second jump (double jump) - when triple jump is unlocked
-            this.setVelocityY(-500); // Medium air jump
-            
-            // Visual effect for double jump
-            this.setTint(0x00ffff); // Brief cyan tint
-            this.gameScene.time.delayedCall(100, () => {
-                this.setTint(0xffffff); // Reset to normal
-            });
-        } else if (this.jumpsRemaining === 1 && this.abilityRanks.jump >= 2) {
-            // Third jump (triple jump) - final air jump
-            this.setVelocityY(-400); // Weakest air jump
-            
-            // Visual effect for triple jump
-            this.setTint(0xffff00); // Brief yellow tint
-            this.gameScene.time.delayedCall(150, () => {
-                this.setTint(0xffffff); // Reset to normal
-            });
-        } else if (this.jumpsRemaining === 1 && this.abilityRanks.jump >= 1) {
-            // Double jump (when only double jump is available)
-            this.setVelocityY(-450); // Air jump
-            
-            // Visual effect for double jump
-            this.setTint(0x00ffff); // Brief cyan tint
-            this.gameScene.time.delayedCall(100, () => {
-                this.setTint(0xffffff); // Reset to normal
-            });
+            console.log('Air jump executed with velocity:', jumpVelocities[currentAirJump - 1]);
         } else {
             // Jump not unlocked yet
+            console.log('Air jump not unlocked - need rank', currentAirJump, 'but have rank', this.abilityRanks.jump);
             return; // Don't consume jump
         }
-        
+
         this.jumpsRemaining--;
+        console.log('Air jump consumed, jumpsRemaining now:', this.jumpsRemaining);
+    } else {
+        console.log('No jumps remaining');
     }
 }
 
 fastFall(){
     // Only allow fast fall when unlocked and in the air and falling (positive Y velocity)
     if (this.abilityRanks.fastFall >= 1 && !this.body.blocked.down && this.body.velocity.y > 0) {
-        this.setVelocityY(800); // Fast fall speed
+        const fastFallSpeeds = [0, 800, 900, 1000, 1100, 1200]; // Tier 1-5 fast fall speeds
+        const fastFallSpeed = fastFallSpeeds[this.abilityRanks.fastFall] || 800;
+        this.setVelocityY(fastFallSpeed);
     }
 }
 
@@ -223,20 +224,22 @@ getJumpUpgradeName() {
         if (nextRank === 1) return 'Double Jump';
         if (nextRank === 2) return 'Triple Jump';
         if (nextRank === 3) return 'Quad Jump';
-        return 'Jump'; // Fallback or max rank
+        if (nextRank === 4) return 'Penta Jump';
+        if (nextRank === 5) return 'Hexa Jump';
+        return 'Jump MAX'; // Fallback or max rank
     }
 
 getStarMagnetUpgradeName() {
         const currentRank = this.abilityRanks.starMagnet;
-        const tierNames = ['Star Magnet I', 'Star Magnet II', 'Star Magnet III', 'Star Magnet IV'];
-        if (currentRank >= 4) return 'Star Magnet MAX';
+        const tierNames = ['Star Magnet I', 'Star Magnet II', 'Star Magnet III', 'Star Magnet IV', 'Star Magnet V'];
+        if (currentRank >= 5) return 'Star Magnet MAX';
         return tierNames[currentRank] || 'Star Magnet I';
     }
 
 getSlowBombsUpgradeName() {
         const currentRank = this.abilityRanks.slowBombs;
-        const tierNames = ['Slow Bombs I', 'Slow Bombs II', 'Slow Bombs III', 'Slow Bombs IV'];
-        if (currentRank >= 4) return 'Slow Bombs MAX';
+        const tierNames = ['Slow Bombs I', 'Slow Bombs II', 'Slow Bombs III', 'Slow Bombs IV', 'Slow Bombs V'];
+        if (currentRank >= 5) return 'Slow Bombs MAX';
         return tierNames[currentRank] || 'Slow Bombs I';
     }
 
@@ -245,10 +248,64 @@ getSpeedUpgradeName() {
         if (nextRank === 1) return 'Super Speed I';
         if (nextRank === 2) return 'Super Speed II';
         if (nextRank === 3) return 'Super Speed III';
-        return 'Super Speed'; // Fallback or max rank
+        if (nextRank === 4) return 'Super Speed IV';
+        if (nextRank === 5) return 'Super Speed V';
+        return 'Super Speed MAX'; // Fallback or max rank
+    }    getPlatformDropUpgradeName() {
+        const nextRank = this.abilityRanks.platformDrop + 1;
+        if (nextRank === 1) return 'Platform Jump';
+        if (nextRank === 2) return 'Platform Drop';
+        if (nextRank === 3) return 'Platform Drop All';
+        return 'Platform Drop MAX';
+    }    getExtraLifeUpgradeName() {
+        return 'Extra Life'; // Always shows the same name, no "MAX"
+    }
+
+    getStarMultiplierUpgradeName() {
+        const nextRank = this.abilityRanks.starMultiplier + 1;
+        if (nextRank === 1) return 'Star Value +12';
+        if (nextRank === 2) return 'Star Value +15';
+        if (nextRank === 3) return 'Star Value +18';
+        return 'Star Value MAX';
+    }
+
+    getTokenBonusUpgradeName() {
+        const nextRank = this.abilityRanks.tokenBonus + 1;
+        if (nextRank === 1) return 'Token Bonus +2';
+        if (nextRank === 2) return 'Token Bonus +3';
+        if (nextRank === 3) return 'Token Bonus +4';
+        return 'Token Bonus MAX';
+    }
+
+    getSonicBoomUpgradeName() {
+        const nextRank = this.abilityRanks.sonicBoom + 1;
+        if (nextRank === 1) return 'Sonic Boom I';
+        if (nextRank === 2) return 'Sonic Boom II';
+        if (nextRank === 3) return 'Sonic Boom III';
+        return 'Sonic Boom MAX';
+    }
+
+    getBarrierUpgradeName() {
+        const nextRank = this.abilityRanks.barrier + 1;
+        if (nextRank === 1) return 'Barrier I';
+        if (nextRank === 2) return 'Barrier II';
+        if (nextRank === 3) return 'Barrier III';
+        return 'Barrier MAX';
+    }
+
+    getLifeRegenUpgradeName() {
+        const nextRank = this.abilityRanks.lifeRegen + 1;
+        if (nextRank === 1) return 'Life Regen I';
+        if (nextRank === 2) return 'Life Regen II';
+        if (nextRank === 3) return 'Life Regen III';
+        if (nextRank === 4) return 'Life Regen IV';
+        if (nextRank === 5) return 'Life Regen V';
+        return 'Life Regen MAX';
     }
 
 getMaxJumps() {
+    if (this.abilityRanks.jump >= 5) return 6; // Hexa jump
+    if (this.abilityRanks.jump >= 4) return 5; // Penta jump
     if (this.abilityRanks.jump >= 3) return 4; // Quad jump
     if (this.abilityRanks.jump >= 2) return 3; // Triple jump
     if (this.abilityRanks.jump >= 1) return 2; // Double jump
@@ -272,33 +329,52 @@ canUpgrade(abilityName) {
 
 getUpgradeCost(abilityName, currentRank) {
     const costs = {
-        jump: [{ tokens: 1, specialTokens: 0 }, { tokens: 2, specialTokens: 0 }, { tokens: 3, specialTokens: 0 }],
-        speed: [{ tokens: 1, specialTokens: 0 }, { tokens: 2, specialTokens: 0 }, { tokens: 3, specialTokens: 0 }],
-        fastFall: [{ tokens: 1, specialTokens: 0 }],
-        barrier: [{ tokens: 0, specialTokens: 1 }, { tokens: 3, specialTokens: 1 }],
-        timeFreeze: [{ tokens: 0, specialTokens: 1 }, { tokens: 4, specialTokens: 1 }],
-        slowBombs: [{ tokens: 1, specialTokens: 0 }, { tokens: 2, specialTokens: 0 }, { tokens: 3, specialTokens: 0 }, { tokens: 4, specialTokens: 0 }],
-        starMagnet: [{ tokens: 1, specialTokens: 0 }, { tokens: 2, specialTokens: 0 }, { tokens: 3, specialTokens: 0 }, { tokens: 4, specialTokens: 0 }],
-        emp: [{ tokens: 0, specialTokens: 1 }, { tokens: 3, specialTokens: 0 }]
+        jump: [{ tokens: 1, specialTokens: 0 }, { tokens: 2, specialTokens: 0 }, { tokens: 3, specialTokens: 0 }, { tokens: 4, specialTokens: 0 }, { tokens: 5, specialTokens: 0 }],
+        speed: [{ tokens: 1, specialTokens: 0 }, { tokens: 2, specialTokens: 0 }, { tokens: 3, specialTokens: 0 }, { tokens: 4, specialTokens: 0 }, { tokens: 5, specialTokens: 0 }],
+        fastFall: [{ tokens: 1, specialTokens: 0 }, { tokens: 2, specialTokens: 0 }, { tokens: 3, specialTokens: 0 }, { tokens: 4, specialTokens: 0 }, { tokens: 5, specialTokens: 0 }],
+        barrier: [{ tokens: 0, specialTokens: 1 }, { tokens: 5, specialTokens: 0 }, { tokens: 10, specialTokens: 0 }],
+        slowBombs: [{ tokens: 1, specialTokens: 0 }, { tokens: 2, specialTokens: 0 }, { tokens: 3, specialTokens: 0 }, { tokens: 4, specialTokens: 0 }, { tokens: 5, specialTokens: 0 }],
+        starMagnet: [{ tokens: 1, specialTokens: 0 }, { tokens: 2, specialTokens: 0 }, { tokens: 3, specialTokens: 0 }, { tokens: 4, specialTokens: 0 }, { tokens: 5, specialTokens: 0 }],
+        emp: [{ tokens: 0, specialTokens: 1 }, { tokens: 3, specialTokens: 0 }, { tokens: 4, specialTokens: 1 }],
+        platformDrop: [{ tokens: 0, specialTokens: 1 }, { tokens: 5, specialTokens: 0 }, { tokens: 10, specialTokens: 0 }],
+        tokenBonus: [{ tokens: 0, specialTokens: 1 }, { tokens: 5, specialTokens: 0 }, { tokens: 10, specialTokens: 0 }],
+        starMultiplier: [{ tokens: 4, specialTokens: 0 }, { tokens: 5, specialTokens: 0 }, { tokens: 7, specialTokens: 0 }],
+        sonicBoom: [{ tokens: 0, specialTokens: 1 }, { tokens: 10, specialTokens: 0 }, { tokens: 15, specialTokens: 0 }],
+        lifeRegen: [{ tokens: 1, specialTokens: 0 }, { tokens: 2, specialTokens: 0 }, { tokens: 3, specialTokens: 0 }, { tokens: 4, specialTokens: 0 }, { tokens: 5, specialTokens: 0 }],
+        extraLife: [] // Will be handled by default return
     };
+    
+    // Special handling for extraLife - always costs 5 tokens
+    if (abilityName === 'extraLife') {
+        return { tokens: 5, specialTokens: 0 };
+    }
     
     return costs[abilityName][currentRank] || { tokens: 0, specialTokens: 0 };
 }
 
 getMaxRank(abilityName) {
     const maxRanks = {
-        jump: 3, speed: 3, fastFall: 1, barrier: 2,
-        timeFreeze: 2, slowBombs: 4, starMagnet: 4, emp: 2
+        jump: 5, speed: 5, fastFall: 5, barrier: 3,
+        slowBombs: 5, starMagnet: 5, emp: 3, platformDrop: 3, tokenBonus: 3, starMultiplier: 3, extraLife: 999, sonicBoom: 3, lifeRegen: 5
     };
     return maxRanks[abilityName] || 1;
 }
 
 requiresSpecialToken(abilityName, currentRank) {
-    if (abilityName === 'barrier' || abilityName === 'timeFreeze') {
-        return true; // Always requires special tokens
+    if (abilityName === 'barrier' && currentRank === 0) {
+        return true; // Only first barrier upgrade requires special token
     }
     if (abilityName === 'emp' && currentRank === 0) {
         return true; // Only first EMP upgrade requires special token
+    }
+    if (abilityName === 'platformDrop' && currentRank === 0) {
+        return true; // Only first platform drop upgrade requires special token
+    }
+    if (abilityName === 'tokenBonus' && currentRank === 0) {
+        return true; // Only first token bonus upgrade requires special token
+    }
+    if (abilityName === 'sonicBoom' && currentRank === 0) {
+        return true; // Only first sonic boom upgrade requires special token
     }
     return false;
 }
@@ -317,6 +393,21 @@ upgradeAbility(abilityName) {
     // Increase rank
     this.abilityRanks[abilityName]++;
     
+    // Special handling for extra life - add a life to the game
+    if (abilityName === 'extraLife') {
+        if (this.gameScene && this.gameScene.lives !== undefined) {
+            this.gameScene.lives++;
+            if (this.gameScene.livesText) {
+                this.gameScene.livesText.setText('Lives: ' + this.gameScene.lives);
+            }
+        }
+    }
+    
+    // Special handling for sonic boom - add charges when upgraded
+    if (abilityName === 'sonicBoom') {
+        this.addSonicBoomCharges();
+    }
+    
     // Update dependent properties
     this.updateAbilityProperties();
     
@@ -334,22 +425,33 @@ updateAbilityProperties() {
     this.fastFallUnlocked = this.abilityRanks.fastFall >= 1;
     this.barrierUnlocked = this.abilityRanks.barrier >= 1;
     this.empUnlocked = this.abilityRanks.emp >= 1;
+    this.sonicBoomUnlocked = this.abilityRanks.sonicBoom >= 1;
+    this.lifeRegenUnlocked = this.abilityRanks.lifeRegen >= 1;
+    this.platformJumpUnlocked = this.abilityRanks.platformDrop >= 1; // Jump through platforms from below
+    this.platformDropUnlocked = this.abilityRanks.platformDrop >= 2; // Drop through platforms with down key
+    this.platformDropAllUnlocked = this.abilityRanks.platformDrop >= 3; // Drop through ground and tall walls
     
     // Update barrier properties based on rank
     if (this.abilityRanks.barrier >= 2) {
-        this.barrierDuration = 4000; // Improved duration
-        this.barrierCooldown = 6000; // Faster cooldown
+        this.barrierDuration = 7000; // Tier 2: 7 seconds duration
+        this.barrierCooldown = 10000; // Tier 2: 10 seconds cooldown (faster)
     }
-    
-    // Update time freeze properties based on rank
-    if (this.abilityRanks.timeFreeze >= 2) {
-        this.timeFreezeDuration = 3000; // Improved duration
-        this.timeFreezeCooldown = 8000; // Faster cooldown
+    if (this.abilityRanks.barrier >= 3) {
+        this.barrierDuration = 10000; // Tier 3: 10 seconds duration
+        this.barrierCooldown = 8000; // Tier 3: 8 seconds cooldown (fastest)
     }
     
     // Update EMP properties based on rank
     if (this.abilityRanks.emp >= 2) {
-        this.starsNeededForEMP = 150; // Improved - needs fewer stars
+        this.starPointsNeededForEMP = 450; // Tier 2 - needs fewer star points
+    }
+    if (this.abilityRanks.emp >= 3) {
+        this.starPointsNeededForEMP = 400; // Tier 3 - even fewer star points needed
+    }
+    
+    // Update life regen properties based on rank
+    if (this.abilityRanks.lifeRegen >= 1) {
+        this.lifeRegenPointsNeededForLife = 325 - ((this.abilityRanks.lifeRegen - 1) * 25); // Reduces by 25 per tier: 325, 300, 275, 250, 225
     }
 }
 
@@ -361,6 +463,7 @@ activateBarrier() {
     
     this.barrierActive = true;
     this.barrierCharge = 0; // Use up all charge
+    this.barrierPointsCollected = 0; // Reset star points counter
     
     // Create glowing barrier visual effect
     this.createBarrierEffect();
@@ -437,56 +540,9 @@ deactivateBarrier() {
     }
 }
 
-// Check if barrier deflects bombs
-deflectsBombs() {
+// Check if barrier makes player invincible
+isInvincible() {
     return this.barrierActive;
-}
-
-// Apply magnetic force to push bombs away
-applyMagneticForce(bombs) {
-    if (!this.barrierActive) return;
-    
-    const magneticRange = 200; // Keep the same range
-    const pushSpeed = 300; // Controlled push speed (not accelerating)
-    
-    bombs.children.entries.forEach(bomb => {
-        const distance = Phaser.Math.Distance.Between(this.x, this.y, bomb.x, bomb.y);
-        
-        if (distance < magneticRange && distance > 0) {
-            // Calculate push direction (away from player)
-            const angle = Phaser.Math.Angle.Between(this.x, this.y, bomb.x, bomb.y);
-            
-            // Set controlled velocity to push bombs away at consistent speed
-            // Closer bombs get pushed more directly, farther ones get gentler nudge
-            const distanceRatio = (magneticRange - distance) / magneticRange;
-            const currentPushSpeed = pushSpeed * (0.5 + distanceRatio * 0.5); // 50% to 100% of push speed
-            
-            // Set velocity directly instead of adding to existing velocity
-            const pushX = Math.cos(angle) * currentPushSpeed;
-            const pushY = Math.sin(angle) * currentPushSpeed;
-            
-            bomb.setVelocity(pushX, pushY);
-            
-            // Enhanced visual feedback - more intense glow for stronger force
-            if (!bomb.magneticTint) {
-                bomb.setTint(0x00ffff);
-                bomb.magneticTint = true;
-                
-                // Add screen shake effect for bombs entering the field
-                if (distance < 100) {
-                    this.gameScene.cameras.main.shake(40, 0.01);
-                }
-                
-                // Remove tint after a short delay
-                this.gameScene.time.delayedCall(300, () => {
-                    if (bomb.active) {
-                        bomb.setTint(0xffffff);
-                        bomb.magneticTint = false;
-                    }
-                });
-            }
-        }
-    });
 }
 
 // Update method to reset jumps when touching ground
@@ -499,21 +555,8 @@ update() {
     // Track ground state for next frame
     this.wasOnGround = this.body.blocked.down;
     
-    // Recharge barrier over time
-    if (this.abilityRanks.barrier >= 1 && !this.barrierActive && this.barrierCharge < this.barrierMaxCharge) {
-        this.barrierCharge += this.barrierMaxCharge / (this.barrierCooldown / 16.67); // Assuming 60 FPS
-        if (this.barrierCharge > this.barrierMaxCharge) {
-            this.barrierCharge = this.barrierMaxCharge;
-        }
-    }
-    
-    // Recharge time freeze over time
-    if (this.abilityRanks.timeFreeze >= 1 && !this.timeFreezeActive && this.timeFreezeCharge < this.timeFreezeMaxCharge) {
-        this.timeFreezeCharge += this.timeFreezeMaxCharge / (this.timeFreezeCooldown / 16.67); // Assuming 60 FPS
-        if (this.timeFreezeCharge > this.timeFreezeMaxCharge) {
-            this.timeFreezeCharge = this.timeFreezeMaxCharge;
-        }
-    }
+    // Recharge barrier over time - REMOVED: Now charges with star points instead
+    // Barrier now charges based on star points collected, not time
     
     // Update barrier visual effect if active
     if (this.barrierActive) {
@@ -521,44 +564,50 @@ update() {
     }
 }
 
-// Activate time freeze ability
-activateTimeFreeze() {
-    if (this.abilityRanks.timeFreeze < 1 || this.timeFreezeActive || this.timeFreezeCharge < 100) {
-        return false; // Can't activate
-    }
-    
-    this.timeFreezeActive = true;
-    this.timeFreezeCharge = 0; // Use up all charge
-    
-    // Slow down physics for bombs and stars
-    this.gameScene.physics.world.timeScale = 0.2; // Slow time
-    
-    // Visual effect - tint the screen
-    this.gameScene.cameras.main.setTint(0x88ccff);
-    
-    // Deactivate after duration
-    this.gameScene.time.delayedCall(this.timeFreezeDuration, () => {
-        this.deactivateTimeFreeze();
-    });
-    
-    return true;
-}
-
-// Deactivate time freeze
-deactivateTimeFreeze() {
-    this.timeFreezeActive = false;
-    
-    // Restore normal time
-    this.gameScene.physics.world.timeScale = 1.0;
-    
-    // Remove visual effect
-    this.gameScene.cameras.main.clearTint();
-}
-
     // Get the bomb slow factor based on upgrade level (permanent stat)
     getBombSlowFactor() {
-        const slowLevels = [1.0, 0.75, 0.55, 0.35, 0.20]; // 0=normal, 1-4=increasingly slower and more powerful
+        const slowLevels = [1.0, 0.75, 0.55, 0.35, 0.20, 0.10]; // 0=normal, 1-5=increasingly slower and more powerful
         return slowLevels[this.abilityRanks.slowBombs] || 1.0;
+    }
+
+    getStarScoreValue() {
+        const scoreValues = [9, 12, 15, 18]; // 0=9 points, 1=12 points, 2=15 points, 3=18 points
+        return scoreValues[this.abilityRanks.starMultiplier] || 9;
+    }
+
+    getBonusTokensPerLevel() {
+        const bonusTokens = [0, 2, 3, 4]; // 0=no bonus, 1=+2 tokens, 2=+3 tokens, 3=+4 tokens
+        return bonusTokens[this.abilityRanks.tokenBonus] || 0;
+    }
+
+// Get barrier charge information for UI display
+getBarrierChargePercentage() {
+        return this.barrierCharge;
+    }
+    
+    // Get barrier charge progress (points collected toward next charge)
+    getBarrierChargeProgress() {
+        return {
+            current: this.barrierPointsCollected,
+            needed: this.barrierPointsNeededForCharge,
+            percentage: this.barrierCharge
+        };
+    }
+    
+    // Check if barrier is ready to use
+    isBarrierReady() {
+        return this.barrierUnlocked && this.barrierCharge >= 100 && !this.barrierActive;
+    }
+
+// Get life regen charge progress for UI display
+    getLifeRegenProgress() {
+        if (!this.lifeRegenUnlocked) return { current: 0, needed: 325, percentage: 0 };
+        
+        return {
+            current: this.lifeRegenPointsCollected,
+            needed: this.lifeRegenPointsNeededForLife,
+            percentage: (this.lifeRegenPointsCollected / this.lifeRegenPointsNeededForLife) * 100
+        };
     }
 
 // Apply magnetic effect to stars (Star Magnet ability)
@@ -605,40 +654,118 @@ applyStarMagnet(stars) {
 }
 
 // Track star collection for EMP charging
-collectStar() {
-        this.starsCollected++;
-        if (this.empUnlocked && this.starsCollected >= this.starsNeededForEMP && !this.empAvailable) {
+collectStar(starPoints = 9) {
+        this.starPointsCollected += starPoints;
+        if (this.empUnlocked && this.starPointsCollected >= this.starPointsNeededForEMP && !this.empAvailable) {
             this.empAvailable = true;
-            this.starsCollected = 0; // Reset counter
+            this.starPointsCollected = 0; // Reset counter
+        }
+        
+        // Charge barrier with star points
+        if (this.barrierUnlocked && !this.barrierActive && this.barrierCharge < this.barrierMaxCharge) {
+            this.barrierPointsCollected += starPoints;
+            if (this.barrierPointsCollected >= this.barrierPointsNeededForCharge) {
+                this.barrierCharge = this.barrierMaxCharge; // Fully charge barrier
+                this.barrierPointsCollected = 0; // Reset counter
+            } else {
+                // Update charge percentage based on points collected
+                this.barrierCharge = (this.barrierPointsCollected / this.barrierPointsNeededForCharge) * this.barrierMaxCharge;
+            }
+        }
+        
+        // Life regen system - regenerate lives based on star points
+        if (this.lifeRegenUnlocked) {
+            this.lifeRegenPointsCollected += starPoints;
+            if (this.lifeRegenPointsCollected >= this.lifeRegenPointsNeededForLife) {
+                // Grant a new life
+                if (this.gameScene && this.gameScene.lives !== undefined) {
+                    this.gameScene.lives++;
+                    if (this.gameScene.livesText) {
+                        this.gameScene.livesText.setText('Lives: ' + this.gameScene.lives);
+                    }
+                    
+                    // Show life regen notification
+                    const lifeRegenText = this.gameScene.add.text(this.gameScene.cameras.main.centerX, 190, 'LIFE REGENERATED!', {
+                        fontFamily: 'Arial Black',
+                        fontSize: 32,
+                        color: '#00ff00',
+                        stroke: '#000000',
+                        strokeThickness: 4
+                    }).setOrigin(0.5);
+                    
+                    this.gameScene.tweens.add({
+                        targets: lifeRegenText,
+                        alpha: 0,
+                        duration: 2000,
+                        ease: 'Power2',
+                        onComplete: () => {
+                            lifeRegenText.destroy();
+                        }
+                    });
+                }
+                
+                // Reset points counter
+                this.lifeRegenPointsCollected = 0;
+            }
         }
     }
     
     // Activate EMP ability
     activateEMP(bombs) {
-        if (!this.empUnlocked || !this.empAvailable) {
+        if (!this.empUnlocked || !this.empAvailable || this.empActive) {
             return false; // Can't activate
         }
         
-        // Find the closest bomb to destroy
-        let closestBomb = null;
-        let closestDistance = Infinity;
-        
+        // Find all active bombs and store their properties
+        const activeBombs = [];
         bombs.children.entries.forEach(bomb => {
             if (bomb.active) {
-                const distance = Phaser.Math.Distance.Between(this.x, this.y, bomb.x, bomb.y);
-                if (distance < closestDistance) {
-                    closestDistance = distance;
-                    closestBomb = bomb;
-                }
+                activeBombs.push({
+                    x: bomb.x,
+                    y: bomb.y,
+                    velocityX: bomb.body.velocity.x,
+                    velocityY: bomb.body.velocity.y
+                });
             }
         });
         
-        if (closestBomb) {
-            // Create dramatic explosion effect
-            this.createEMPEffect(closestBomb.x, closestBomb.y);
+        if (activeBombs.length > 0) {
+            // Set EMP as active
+            this.empActive = true;
             
-            // Destroy the bomb
-            closestBomb.destroy();
+            // Create dramatic EMP effect at player position
+            this.createEMPEffect(activeBombs.length);
+            
+            // Destroy all bombs immediately - use multiple methods for thoroughness
+            bombs.clear(true, true); // Clear all bombs from the group and destroy them
+            
+            // Also manually destroy any remaining bombs just in case
+            bombs.children.entries.forEach(bomb => {
+                if (bomb && bomb.active) {
+                    bomb.destroy();
+                }
+            });
+            
+            // Double-check: remove any bombs that might still exist
+            this.gameScene.children.list.forEach(child => {
+                if (child.texture && child.texture.key === 'bomb') {
+                    child.destroy();
+                }
+            });
+            
+            // Determine delay based on EMP tier
+            let delay = this.empDelayTier1; // Default 8 seconds
+            if (this.abilityRanks.emp >= 3) {
+                delay = this.empDelayTier3; // 4 seconds
+            } else if (this.abilityRanks.emp >= 2) {
+                delay = this.empDelayTier2; // 6 seconds
+            }
+            
+            // Return bombs after delay
+            this.gameScene.time.delayedCall(delay, () => {
+                this.returnBombs(activeBombs);
+                this.empActive = false;
+            });
             
             // Use up the EMP
             this.empAvailable = false;
@@ -650,32 +777,283 @@ collectStar() {
         return false;
     }
     
+    // Return bombs to the game after EMP delay
+    returnBombs(bombData) {
+        bombData.forEach(bombInfo => {
+            // Create new bomb at stored position
+            const bomb = this.gameScene.bombs.create(bombInfo.x, bombInfo.y, 'bomb');
+            bomb.setBounce(1);
+            bomb.setCollideWorldBounds(true);
+            bomb.body.bounce.setTo(1, 1);
+            bomb.body.friction.setTo(0, 0);
+            bomb.body.drag.setTo(0, 0);
+            
+            // Restore velocity (or give random velocity if original was too slow)
+            const minSpeed = 100;
+            let vx = bombInfo.velocityX;
+            let vy = bombInfo.velocityY;
+            
+            // Ensure minimum speed
+            if (Math.abs(vx) < minSpeed) {
+                vx = vx >= 0 ? minSpeed : -minSpeed;
+            }
+            if (Math.abs(vy) < minSpeed) {
+                vy = vy >= 0 ? minSpeed : -minSpeed;
+            }
+            
+            bomb.setVelocity(vx, vy);
+        });
+        
+        // Show "Bombs Restored!" message with count
+        const warningText = this.gameScene.add.text(725, 400, `${bombData.length} BOMBS RESTORED!`, {
+            fontFamily: 'Arial Black',
+            fontSize: 32,
+            color: '#ff0000',
+            stroke: '#000000',
+            strokeThickness: 4
+        }).setOrigin(0.5);
+        
+        this.gameScene.tweens.add({
+            targets: warningText,
+            alpha: 0,
+            duration: 2000,
+            ease: 'Power2',
+            onComplete: () => {
+                warningText.destroy();
+            }
+        });
+    }
+    
     // Create EMP explosion visual effect
-    createEMPEffect(x, y) {
-        // Create electric explosion effect
+    createEMPEffect(bombCount = 0) {
+        // Create electric explosion effect centered on player
         const empGraphics = this.gameScene.add.graphics();
         
-        // Create multiple electric rings
-        for (let i = 0; i < 5; i++) {
-            this.gameScene.time.delayedCall(i * 50, () => {
+        // Create expanding electric rings from player position
+        for (let i = 0; i < 8; i++) {
+            this.gameScene.time.delayedCall(i * 100, () => {
                 empGraphics.clear();
-                empGraphics.lineStyle(4, 0x00ffff, 1 - (i * 0.2));
-                empGraphics.strokeCircle(x, y, 20 + (i * 30));
                 
-                empGraphics.lineStyle(6, 0xffffff, 1 - (i * 0.2));
-                empGraphics.strokeCircle(x, y, 10 + (i * 20));
+                // Outer ring
+                empGraphics.lineStyle(6, 0x00ffff, 1 - (i * 0.12));
+                empGraphics.strokeCircle(this.x, this.y, 50 + (i * 80));
+                
+                // Inner ring
+                empGraphics.lineStyle(8, 0xffffff, 1 - (i * 0.12));
+                empGraphics.strokeCircle(this.x, this.y, 30 + (i * 60));
+                
+                // Lightning effect
+                if (i < 4) {
+                    empGraphics.lineStyle(4, 0xffff00, 1 - (i * 0.25));
+                    empGraphics.beginPath();
+                    for (let j = 0; j < 8; j++) {
+                        const angle = (j * Math.PI * 2) / 8;
+                        const radius = 40 + (i * 50);
+                        const x = this.x + Math.cos(angle) * radius;
+                        const y = this.y + Math.sin(angle) * radius;
+                        empGraphics.lineTo(x, y);
+                    }
+                    empGraphics.closePath();
+                    empGraphics.strokePath();
+                }
+            });
+        }
+        
+        // Screen shake effect - more intense
+        this.gameScene.cameras.main.shake(500, 0.03);
+        
+        // Show "EMP ACTIVATED!" message with bomb count
+        const empText = this.gameScene.add.text(this.x, this.y - 60, `EMP ACTIVATED!\n${bombCount} BOMBS DESTROYED!`, {
+            fontFamily: 'Arial Black',
+            fontSize: 20,
+            color: '#00ffff',
+            stroke: '#000000',
+            strokeThickness: 3,
+            align: 'center'
+        }).setOrigin(0.5);
+        
+        this.gameScene.tweens.add({
+            targets: empText,
+            y: this.y - 100,
+            alpha: 0,
+            duration: 1500,
+            ease: 'Power2',
+            onComplete: () => {
+                empText.destroy();
+            }
+        });
+        
+        // Clean up after animation
+        this.gameScene.time.delayedCall(1000, () => {
+            if (empGraphics) {
+                empGraphics.destroy();
+            }
+        });
+    }
+
+    // Activate Sonic Boom ability
+    activateSonicBoom(bombs) {
+        if (!this.sonicBoomUnlocked || this.sonicBoomAvailable <= 0) {
+            return false; // Can't activate
+        }
+        
+        // Determine how many bombs to destroy based on tier
+        let bombsToDestroy = 1; // Tier 1
+        if (this.abilityRanks.sonicBoom >= 3) {
+            bombsToDestroy = 3; // Tier 3
+        } else if (this.abilityRanks.sonicBoom >= 2) {
+            bombsToDestroy = 2; // Tier 2
+        }
+        
+        // Find active bombs and select closest ones to destroy
+        const activeBombs = [];
+        bombs.children.entries.forEach(bomb => {
+            if (bomb.active) {
+                const distance = Phaser.Math.Distance.Between(this.x, this.y, bomb.x, bomb.y);
+                activeBombs.push({ bomb: bomb, distance: distance });
+            }
+        });
+        
+        if (activeBombs.length === 0) {
+            return false; // No bombs to destroy
+        }
+        
+        // Sort by distance and take the closest ones
+        activeBombs.sort((a, b) => a.distance - b.distance);
+        const bombsDestroyed = Math.min(bombsToDestroy, activeBombs.length);
+        
+        // Create pulse grenade effect at player position
+        this.createSonicBoomEffect(bombsDestroyed);
+        
+        // Destroy the closest bombs with visual effects
+        for (let i = 0; i < bombsDestroyed; i++) {
+            const bombToDestroy = activeBombs[i].bomb;
+            
+            // Create explosion effect at bomb position
+            this.createBombDestructionEffect(bombToDestroy.x, bombToDestroy.y);
+            
+            // Destroy the bomb
+            bombToDestroy.destroy();
+        }
+        
+        // Use up one sonic boom charge
+        this.sonicBoomAvailable--;
+        
+        return true;
+    }
+    
+    // Create Sonic Boom pulse grenade visual effect
+    createSonicBoomEffect(bombsDestroyed) {
+        // Create pulse wave effect centered on player
+        const pulseGraphics = this.gameScene.add.graphics();
+        
+        // Create expanding pulse rings from player position
+        for (let i = 0; i < 6; i++) {
+            this.gameScene.time.delayedCall(i * 80, () => {
+                pulseGraphics.clear();
+                
+                // Outer pulse ring
+                pulseGraphics.lineStyle(8, 0xff6600, 1 - (i * 0.15));
+                pulseGraphics.strokeCircle(this.x, this.y, 40 + (i * 60));
+                
+                // Inner pulse ring
+                pulseGraphics.lineStyle(12, 0xffaa00, 1 - (i * 0.15));
+                pulseGraphics.strokeCircle(this.x, this.y, 25 + (i * 40));
+                
+                // Core pulse
+                if (i < 3) {
+                    pulseGraphics.lineStyle(6, 0xffffff, 1 - (i * 0.3));
+                    pulseGraphics.strokeCircle(this.x, this.y, 15 + (i * 20));
+                }
             });
         }
         
         // Screen shake effect
         this.gameScene.cameras.main.shake(300, 0.02);
         
-        // Clean up after animation
-        this.gameScene.time.delayedCall(500, () => {
-            if (empGraphics) {
-                empGraphics.destroy();
+        // Show "SONIC BOOM!" message
+        const boomText = this.gameScene.add.text(this.x, this.y - 50, `SONIC BOOM!\n${bombsDestroyed} BOMBS DESTROYED!`, {
+            fontFamily: 'Arial Black',
+            fontSize: 18,
+            color: '#ff6600',
+            stroke: '#000000',
+            strokeThickness: 3,
+            align: 'center'
+        }).setOrigin(0.5);
+        
+        this.gameScene.tweens.add({
+            targets: boomText,
+            y: this.y - 80,
+            alpha: 0,
+            duration: 1200,
+            ease: 'Power2',
+            onComplete: () => {
+                boomText.destroy();
             }
         });
+        
+        // Clean up after animation
+        this.gameScene.time.delayedCall(800, () => {
+            if (pulseGraphics) {
+                pulseGraphics.destroy();
+            }
+        });
+    }
+    
+    // Create bomb destruction visual effect
+    createBombDestructionEffect(x, y) {
+        const explosionGraphics = this.gameScene.add.graphics();
+        
+        // Create small explosion effect at bomb position
+        for (let i = 0; i < 4; i++) {
+            this.gameScene.time.delayedCall(i * 50, () => {
+                explosionGraphics.clear();
+                
+                // Orange explosion burst
+                explosionGraphics.fillStyle(0xff6600, 1 - (i * 0.25));
+                explosionGraphics.fillCircle(x, y, 20 + (i * 10));
+                
+                // Yellow inner burst
+                explosionGraphics.fillStyle(0xffaa00, 1 - (i * 0.25));
+                explosionGraphics.fillCircle(x, y, 15 + (i * 8));
+                
+                // White core
+                explosionGraphics.fillStyle(0xffffff, 1 - (i * 0.3));
+                explosionGraphics.fillCircle(x, y, 8 + (i * 5));
+            });
+        }
+        
+        // Clean up explosion effect
+        this.gameScene.time.delayedCall(300, () => {
+            if (explosionGraphics) {
+                explosionGraphics.destroy();
+            }
+        });
+    }
+    
+    // Get available sonic boom charges (for UI display)
+    getSonicBoomCharges() {
+        return this.sonicBoomAvailable;
+    }
+    
+    // Add sonic boom charges when upgrading
+    addSonicBoomCharges() {
+        if (this.abilityRanks.sonicBoom >= 1) {
+            this.sonicBoomAvailable += 1; // Add 1 charge when upgraded
+        }
+    }
+
+    // Charge Sonic Boom based on points collected
+    chargeSonicBoom(points) {
+        if (!this.sonicBoomUnlocked) return;
+        
+        this.sonicBoomPointsCollected += points;
+        
+        // Check if we've earned a new charge
+        while (this.sonicBoomPointsCollected >= this.sonicBoomPointsNeededForCharge) {
+            this.sonicBoomPointsCollected -= this.sonicBoomPointsNeededForCharge;
+            this.sonicBoomAvailable += 1;
+        }
     }
 
     // Activate barrier ability
@@ -686,6 +1064,7 @@ collectStar() {
         
         this.barrierActive = true;
         this.barrierCharge = 0; // Use up all charge
+        this.barrierPointsCollected = 0; // Reset star points counter
         
         // Create glowing barrier visual effect
         this.createBarrierEffect();
@@ -762,58 +1141,6 @@ collectStar() {
         }
     }
 
-    // Check if barrier deflects bombs
-    deflectsBombs() {
-        return this.barrierActive;
-    }
-
-    // Apply magnetic force to push bombs away
-    applyMagneticForce(bombs) {
-        if (!this.barrierActive) return;
-        
-        const magneticRange = 200; // Keep the same range
-        const pushSpeed = 300; // Controlled push speed (not accelerating)
-        
-        bombs.children.entries.forEach(bomb => {
-            const distance = Phaser.Math.Distance.Between(this.x, this.y, bomb.x, bomb.y);
-            
-            if (distance < magneticRange && distance > 0) {
-                // Calculate push direction (away from player)
-                const angle = Phaser.Math.Angle.Between(this.x, this.y, bomb.x, bomb.y);
-                
-                // Set controlled velocity to push bombs away at consistent speed
-                // Closer bombs get pushed more directly, farther ones get gentler nudge
-                const distanceRatio = (magneticRange - distance) / magneticRange;
-                const currentPushSpeed = pushSpeed * (0.5 + distanceRatio * 0.5); // 50% to 100% of push speed
-                
-                // Set velocity directly instead of adding to existing velocity
-                const pushX = Math.cos(angle) * currentPushSpeed;
-                const pushY = Math.sin(angle) * currentPushSpeed;
-                
-                bomb.setVelocity(pushX, pushY);
-                
-                // Enhanced visual feedback - more intense glow for stronger force
-                if (!bomb.magneticTint) {
-                    bomb.setTint(0x00ffff);
-                    bomb.magneticTint = true;
-                    
-                    // Add screen shake effect for bombs entering the field
-                    if (distance < 100) {
-                        this.gameScene.cameras.main.shake(40, 0.01);
-                    }
-                    
-                    // Remove tint after a short delay
-                    this.gameScene.time.delayedCall(300, () => {
-                        if (bomb.active) {
-                            bomb.setTint(0xffffff);
-                            bomb.magneticTint = false;
-                        }
-                    });
-                }
-            }
-        });
-    }
-
     // Update method to reset jumps when touching ground
     update() {
         // Check if player just landed on the ground
@@ -824,60 +1151,13 @@ collectStar() {
         // Track ground state for next frame
         this.wasOnGround = this.body.blocked.down;
         
-        // Recharge barrier over time
-        if (this.abilityRanks.barrier >= 1 && !this.barrierActive && this.barrierCharge < this.barrierMaxCharge) {
-            this.barrierCharge += this.barrierMaxCharge / (this.barrierCooldown / 16.67); // Assuming 60 FPS
-            if (this.barrierCharge > this.barrierMaxCharge) {
-                this.barrierCharge = this.barrierMaxCharge;
-            }
-        }
-        
-        // Recharge time freeze over time
-        if (this.abilityRanks.timeFreeze >= 1 && !this.timeFreezeActive && this.timeFreezeCharge < this.timeFreezeMaxCharge) {
-            this.timeFreezeCharge += this.timeFreezeMaxCharge / (this.timeFreezeCooldown / 16.67); // Assuming 60 FPS
-            if (this.timeFreezeCharge > this.timeFreezeMaxCharge) {
-                this.timeFreezeCharge = this.timeFreezeMaxCharge;
-            }
-        }
+        // Recharge barrier over time - REMOVED: Now charges with star points instead
+        // Barrier now charges based on star points collected, not time
         
         // Update barrier visual effect if active
         if (this.barrierActive) {
             this.updateBarrierEffect();
         }
-    }
-
-    // Activate time freeze ability
-    activateTimeFreeze() {
-        if (this.abilityRanks.timeFreeze < 1 || this.timeFreezeActive || this.timeFreezeCharge < 100) {
-            return false; // Can't activate
-        }
-        
-        this.timeFreezeActive = true;
-        this.timeFreezeCharge = 0; // Use up all charge
-        
-        // Slow down physics for bombs and stars
-        this.gameScene.physics.world.timeScale = 0.2; // Slow time
-        
-        // Visual effect - tint the screen
-        this.gameScene.cameras.main.setTint(0x88ccff);
-        
-        // Deactivate after duration
-        this.gameScene.time.delayedCall(this.timeFreezeDuration, () => {
-            this.deactivateTimeFreeze();
-        });
-        
-        return true;
-    }
-
-    // Deactivate time freeze
-    deactivateTimeFreeze() {
-        this.timeFreezeActive = false;
-        
-        // Restore normal time
-        this.gameScene.physics.world.timeScale = 1.0;
-        
-        // Remove visual effect
-        this.gameScene.cameras.main.clearTint();
     }
 
     // Apply magnetic effect to stars (Star Magnet ability)

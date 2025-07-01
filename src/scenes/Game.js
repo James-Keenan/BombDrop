@@ -7,35 +7,45 @@ export class Game extends Phaser.Scene {
     }
 
     create() {
-        // Scale background to fit the new screen size (1200x800)
-        let bg = this.add.image(600, 400, 'sky');
-        bg.setScale(1200 / bg.width, 800 / bg.height);
+        // Scale background to fit the new screen size (1450x950)
+        let bg = this.add.image(725, 475, 'sky');
+        bg.setScale(1450 / bg.width, 950 / bg.height);
 
         this.platforms = this.physics.add.staticGroup();
 
-        this.platforms.create(600, 830, "ground").setScale(3).refreshBody();
+        this.platforms.create(900, 950, "ground").setScale(5.2).refreshBody();
 
         
-        this.platforms.create(450, 420, 'ground').setScale(.4, 0.3).refreshBody();
-        this.platforms.create(900, 300, 'ground').setScale(1.2, 0.3).refreshBody();
-        this.platforms.create(-150, 100, 'ground').setScale(1, 0.3).refreshBody(); //top left
+        // Create horizontally moving platform separately as kinematic body
+        this.movingPlatform = this.physics.add.sprite(408, 399, 'ground').setScale(.4, 0.3);
+        this.movingPlatform.body.setImmovable(true);
+        this.movingPlatform.body.setGravityY(0); // Disable gravity so it doesn't fall
+        this.movingPlatform.setVelocityX(80); // Initial horizontal velocity (moving right)
+        this.movingPlatform.moveDirection = 1; // 1 for right, -1 for left
+        this.movingPlatform.minX = 300; // Left boundary
+        this.movingPlatform.maxX = 700; // Right boundary
+        this.movingPlatform.originalX = 408; // Remember original position
+        this.platforms.create(1110, 185, 'ground').setScale(1.2, 0.3).refreshBody();
+        this.platforms.create(-50, 150, 'ground').setScale(1, 0.3).refreshBody(); //top left
         this.platforms.create(700, 600, 'ground').setScale(1, 0.3).refreshBody();
-        this.platforms.create(200, 300, 'ground').setScale(.5, 0.3).refreshBody();
+        this.platforms.create(181, 825, 'ground').setScale(1, 5.3).refreshBody();
 
-        this.player = new Player(this, 100, 550);
+        this.player = new Player(this, 100, 523);
 
-        this.physics.add.collider(this.player, this.platforms);
+        // Set up platform collision with custom process function for platform drop
+        this.physics.add.collider(this.player, this.platforms, null, this.platformCollisionProcess, this);
+        this.physics.add.collider(this.player, this.movingPlatform, null, this.platformCollisionProcess, this);
 
         this.cursors = this.input.keyboard.createCursorKeys();
         
         // Add SPACE key for barrier activation
         this.cursors.space = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
         
-        // Add T key for time freeze activation
-        this.cursors.timeFreeze = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.T);
-        
         // Add E key for EMP activation
         this.cursors.emp = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.E);
+        
+        // Add Q key for Sonic Boom activation
+        this.cursors.sonicBoom = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Q);
 
         // Create stars with random positions and movement
         this.createMovingStars();
@@ -50,6 +60,7 @@ export class Game extends Phaser.Scene {
 
         // Level system
         this.currentLevel = 1;
+        this.highestLevel = localStorage.getItem('highestLevel') || 1;
         this.nextLevelScore = 500; // Score needed for next level
         this.levelScoreIncrement = 500; // Points between levels
 
@@ -62,17 +73,19 @@ export class Game extends Phaser.Scene {
         // High score on top left, score below it, lives in top middle, level in top right
         this.highScoreText = this.add.text(16, 16, 'Personal Best: ' + this.highScore, { fontsize: '32px', fill: '#fff'});
         this.scoreText = this.add.text(16, 48, 'Score: 0', { fontSize: '24px', fill: '#fff'});
-        this.livesText = this.add.text(600, 16, 'Lives: ' + this.lives, { fontSize: '32px', fill: '#ff0000'}).setOrigin(0.5, 0);
-        this.levelText = this.add.text(1184, 16, 'Level: ' + this.currentLevel, { fontsize: '32px', fill: '#00ff00'}).setOrigin(1, 0);
+        this.starValueText = this.add.text(16, 75, 'Star Value: ' + this.player.getStarScoreValue(), { fontSize: '20px', fill: '#ffff00'});
+        this.livesText = this.add.text(725, 16, 'Lives: ' + this.lives, { fontSize: '32px', fill: '#ff0000'}).setOrigin(0.5, 0);
+        this.levelText = this.add.text(1434, 16, 'Level: ' + this.currentLevel, { fontsize: '32px', fill: '#00ff00'}).setOrigin(1, 0);
         
-        // Track barrier and time freeze key states
-        this.timeFreezeKeyPressed = false;
+        // Track barrier and EMP key states
         this.barrierKeyPressed = false;
         this.empKeyPressed = false;
+        this.sonicBoomKeyPressed = false;
 
         this.bombs = this.physics.add.group();
 
         this.physics.add.collider(this.bombs, this.platforms);
+        this.physics.add.collider(this.bombs, this.movingPlatform);
         this.playerBombCollider = this.physics.add.collider(this.player,this.bombs, this.hitBomb, null, this);
 
         // Track jump key state to prevent continuous jumping
@@ -87,11 +100,14 @@ export class Game extends Phaser.Scene {
         // Create barrier UI elements (initially hidden)
         this.createBarrierUI();
         
-        // Create time freeze UI elements (initially hidden)
-        this.createTimeFreezeUI();
-        
         // Create EMP UI elements (initially hidden)
         this.createEMPUI();
+        
+        // Create Sonic Boom UI elements (initially hidden)
+        this.createSonicBoomUI();
+        
+        // Create Life Regen UI elements (initially hidden)
+        this.createLifeRegenUI();
 
         // Release the first bomb immediately when the game starts
         this.releasedBomb();
@@ -101,6 +117,22 @@ export class Game extends Phaser.Scene {
     update(time) {
         // Update player jump tracking
         this.player.update();
+        
+        // Update horizontally moving platform
+        if (this.movingPlatform) {
+            // Ensure platform stays at fixed Y position (no vertical movement)
+            this.movingPlatform.setVelocityY(0);
+            this.movingPlatform.y = 399; // Force Y position to stay fixed
+            
+            // Check boundaries and reverse direction if needed
+            if (this.movingPlatform.x <= this.movingPlatform.minX) {
+                this.movingPlatform.moveDirection = 1; // Move right
+                this.movingPlatform.setVelocityX(80);
+            } else if (this.movingPlatform.x >= this.movingPlatform.maxX) {
+                this.movingPlatform.moveDirection = -1; // Move left
+                this.movingPlatform.setVelocityX(-80);
+            }
+        }
         
         if (this.cursors.left.isDown){
             this.player.moveLeft();
@@ -134,15 +166,6 @@ export class Game extends Phaser.Scene {
             this.barrierKeyPressed = false;
         }
         
-        // Handle time freeze activation with T key (only when unlocked)
-        if (this.cursors.timeFreeze.isDown && !this.timeFreezeKeyPressed) {
-            if (this.player.activateTimeFreeze()) {
-                this.timeFreezeKeyPressed = true;
-            }
-        } else if (!this.cursors.timeFreeze.isDown) {
-            this.timeFreezeKeyPressed = false;
-        }
-        
         // Handle EMP activation with E key (only when unlocked and available)
         if (this.cursors.emp.isDown && !this.empKeyPressed) {
             if (this.player.activateEMP(this.bombs)) {
@@ -152,104 +175,50 @@ export class Game extends Phaser.Scene {
             this.empKeyPressed = false;
         }
         
+        // Handle Sonic Boom activation with Q key (only when unlocked and available)
+        if (this.cursors.sonicBoom.isDown && !this.sonicBoomKeyPressed) {
+            if (this.player.activateSonicBoom(this.bombs)) {
+                this.sonicBoomKeyPressed = true;
+            }
+        } else if (!this.cursors.sonicBoom.isDown) {
+            this.sonicBoomKeyPressed = false;
+        }
+        
         // Update barrier UI
         this.updateBarrierUI();
         
-        // Update time freeze UI
-        this.updateTimeFreezeUI();
-        
         // Update EMP UI
         this.updateEMPUI();
         
-        // Update EMP UI
-        this.updateEMPUI();
+        // Update Sonic Boom UI
+        this.updateSonicBoomUI();
         
-        // Apply magnetic force to bombs when barrier is active
-        if (this.player.barrierActive) {
-            this.player.applyMagneticForce(this.bombs);
-        }
+        // Update Life Regen UI
+        this.updateLifeRegenUI();
         
         // Apply star magnet effect
         this.player.applyStarMagnet(this.stars);
-
-        // Add dynamic flying behavior to stars only at level 3+
-        if (this.currentLevel >= 3) {
-            this.stars.children.entries.forEach(star => {
-                // Occasionally change direction for more erratic flying
-                if (Phaser.Math.Between(1, 300) === 1) {
-                    star.setVelocityX(Phaser.Math.Between(-180, 180));
-                    star.setVelocityY(Phaser.Math.Between(-150, 150));
-                }
-                
-                // Add floating/drifting behavior
-                if (Phaser.Math.Between(1, 200) === 1) {
-                    // Small velocity adjustments for natural floating
-                    star.body.velocity.x += Phaser.Math.Between(-20, 20);
-                    star.body.velocity.y += Phaser.Math.Between(-20, 20);
-                    
-                    // Cap maximum velocity to prevent stars from going too fast
-                    if (Math.abs(star.body.velocity.x) > 200) {
-                        star.body.velocity.x = star.body.velocity.x > 0 ? 200 : -200;
-                    }
-                    if (Math.abs(star.body.velocity.y) > 180) {
-                        star.body.velocity.y = star.body.velocity.y > 0 ? 180 : -180;
-                    }
-                }
-                
-                // Add occasional "burst" flying for excitement
-                if (Phaser.Math.Between(1, 800) === 1) {
-                    star.setVelocity(
-                        Phaser.Math.Between(-250, 250),
-                        Phaser.Math.Between(-200, 200)
-                    );
-                    // Increase rotation speed during burst
-                    star.setAngularVelocity(Phaser.Math.Between(-500, 500));
-                }
-            });
-        }
 
     }
 
     collectStar (player, star){
         star.disableBody(true, true);
 
-        this.score += 9;
+        // Apply star score value upgrade
+        const scoreEarned = this.player.getStarScoreValue();
+        this.score += scoreEarned;
         this.scoreText.setText('score: ' + this.score);
         
-        // Track star collection for EMP charging
-        this.player.collectStar();
+        // Update star value UI
+        this.starValueText.setText('Star Value: ' + this.player.getStarScoreValue());
+        
+        // Track star collection for EMP charging (pass the actual points earned)
+        this.player.collectStar(scoreEarned);
+        
+        // Track star collection for Sonic Boom charging
+        this.player.chargeSonicBoom(scoreEarned);
 
-        // Check for extra life
-        if (this.score >= this.nextExtraLife) {
-            this.lives++;
-            this.livesText.setText('Lives: ' + this.lives);
-            
-            // Show extra life notification
-            let extraLifeText = this.add.text(600, 200, 'EXTRA LIFE!', {
-                fontFamily: 'Arial Black',
-                fontSize: 48,
-                color: '#00ff00',
-                stroke: '#000000',
-                strokeThickness: 4
-            }).setOrigin(0.5);
-            
-            // Make the text flash and then disappear
-            this.tweens.add({
-                targets: extraLifeText,
-                alpha: 0,
-                duration: 2000,
-                ease: 'Power2',
-                onComplete: () => {
-                    extraLifeText.destroy();
-                }
-            });
-            
-            // Increase the threshold for next extra life
-            this.nextExtraLife += this.extraLifeIncrement;
-            
-            // Increase the increment for subsequent lives by 100 more points
-            this.extraLifeIncrement += this.incrementIncrease;
-        }
+        // Automatic life system removed - now handled by Life Regen ability
 
         // Check for level progression - removed score-based leveling
         // Now levels only increase when all stars are collected!
@@ -267,9 +236,17 @@ export class Game extends Phaser.Scene {
             this.levelText.setText('Level: ' + this.currentLevel);
             console.log('New level:', this.currentLevel);
             
+            // Update highest level if necessary
+            if (this.currentLevel > this.highestLevel) {
+                this.highestLevel = this.currentLevel;
+                localStorage.setItem('highestLevel', this.highestLevel);
+            }
+            
             // Award tokens for completing the level
-            const tokensEarned = this.currentLevel <= 2 ? 1 : 2; // 1 token for levels 1-2, then 2 tokens
-            console.log('Tokens earned:', tokensEarned);
+            const baseTokens = this.currentLevel <= 2 ? 1 : 2; // 1 token for levels 1-2, then 2 tokens
+            const bonusTokens = this.player.getBonusTokensPerLevel(); // Bonus tokens from upgrade
+            const tokensEarned = baseTokens + bonusTokens;
+            console.log('Tokens earned:', tokensEarned, '(base:', baseTokens, '+ bonus:', bonusTokens, ')');
             this.player.earnTokens(tokensEarned);
             this.updateTokenUI();
             
@@ -299,23 +276,23 @@ export class Game extends Phaser.Scene {
     }
 
 hitBomb (player, bomb){
-    // Check if barrier is active - prevent damage (magnetic field should push bombs away)
-    if (player.deflectsBombs()) {
-        // Barrier is active, apply extremely powerful push force as failsafe
-        const angle = Phaser.Math.Angle.Between(player.x, player.y, bomb.x, bomb.y);
-        bomb.setVelocity(
-            Math.cos(angle) * 1800, // Extremely strong failsafe force (was 1200)
-            Math.sin(angle) * 1400   // (was 900)
-        );
-        bomb.setTint(0x00ffff);
+    // Check if barrier is active - player is invincible
+    if (player.isInvincible()) {
+        // Barrier is active, make bomb bounce off the player instead of being destroyed
         
-        // Add intense screen shake for dramatic effect
-        this.cameras.main.shake(200, 0.05);
+        // Calculate bounce direction based on bomb and player positions
+        const bounceForceX = bomb.x < player.x ? -300 : 300; // Bounce away from player
+        const bounceForceY = -200; // Always bounce upward
         
-        this.time.delayedCall(500, () => {
-            if (bomb.active) bomb.setTint(0xffffff);
-        });
-        return; // No damage taken
+        // Apply the bounce force
+        bomb.setVelocity(bounceForceX, bounceForceY);
+        
+        // Ensure bomb maintains its bouncy properties
+        bomb.setBounce(1);
+        bomb.setDrag(0);
+        bomb.setFriction(0);
+        
+        return;
     }
     
     // Check if player is already invincible to prevent multiple hits
@@ -354,8 +331,9 @@ hitBomb (player, bomb){
         player.setTint(0xff0000);
         player.anims.play('turn');
 
-        // Store the final score in the registry so GameOver scene can access it
+        // Store the final score and level in the registry so GameOver scene can access it
         this.registry.set('finalScore', this.score);
+        this.registry.set('finalLevel', this.currentLevel);
         
         // Update high score if necessary
         if (this.score > this.highScore) {
@@ -390,7 +368,7 @@ hitBomb (player, bomb){
         });
         
         // Show life lost notification
-        let lifeLostText = this.add.text(600, 350, 'LIFE LOST! Lives: ' + this.lives, {
+        let lifeLostText = this.add.text(725, 333, 'LIFE LOST! Lives: ' + this.lives, {
             fontFamily: 'Arial Black',
             fontSize: 32,
             color: '#ff0000',
@@ -411,50 +389,23 @@ hitBomb (player, bomb){
 }
 
     releasedBomb(){
-        let x = (this.player.x < 600) ? Phaser.Math.Between(600, 1200) : Phaser.Math.Between(0, 600);
+        let x = (this.player.x < 725) ? Phaser.Math.Between(725, 1450) : Phaser.Math.Between(0, 725);
 
         let bomb = this.bombs.create(x, 16, 'bomb');
         bomb.setBounce(1);
         bomb.setCollideWorldBounds(true);
         
-        // Increase bomb speed and count based on level
+        // Ensure bomb maintains consistent bounce and doesn't lose velocity
+        bomb.body.bounce.setTo(1, 1);
+        bomb.body.friction.setTo(0, 0);
+        bomb.body.drag.setTo(0, 0);
+        
+        // Fixed bomb speed - no level scaling
         const baseSpeed = 200;
-        const levelSpeedMultiplier = this.currentLevel * 30;
-        const bombSpeed = baseSpeed + levelSpeedMultiplier;
         
         // Apply slow bombs stat (permanent effect)
         const slowFactor = this.player.getBombSlowFactor();
-        const finalBombSpeed = bombSpeed * slowFactor;
-        
-        bomb.setVelocity(Phaser.Math.Between(-finalBombSpeed, finalBombSpeed), 20 * slowFactor);
-        
-        // Add extra bombs at higher levels
-        if (this.currentLevel >= 3) {
-            this.time.delayedCall(500, () => {
-                this.createAdditionalBomb();
-            });
-        }
-        
-        if (this.currentLevel >= 5) {
-            this.time.delayedCall(1000, () => {
-                this.createAdditionalBomb();
-            });
-        }
-    }
-
-    createAdditionalBomb() {
-        let x = Phaser.Math.Between(50, 1150);
-        let bomb = this.bombs.create(x, 16, 'bomb');
-        bomb.setBounce(1);
-        bomb.setCollideWorldBounds(true);
-        
-        const baseSpeed = 200;
-        const levelSpeedMultiplier = this.currentLevel * 30;
-        const bombSpeed = baseSpeed + levelSpeedMultiplier;
-        
-        // Apply slow bombs stat (permanent effect)
-        const slowFactor = this.player.getBombSlowFactor();
-        const finalBombSpeed = bombSpeed * slowFactor;
+        const finalBombSpeed = baseSpeed * slowFactor;
         
         bomb.setVelocity(Phaser.Math.Between(-finalBombSpeed, finalBombSpeed), 20 * slowFactor);
     }
@@ -470,62 +421,65 @@ hitBomb (player, bomb){
         
         // Set up collisions and overlaps
         this.physics.add.collider(this.stars, this.platforms);
+        this.physics.add.collider(this.stars, this.movingPlatform);
         this.physics.add.overlap(this.player, this.stars, this.collectStar, null, this);
     }
 
     createFlyingStar() {
-        // Random position anywhere in the game area
-        let x = Phaser.Math.Between(50, 1150);
-        let y = Phaser.Math.Between(50, 700); // Can spawn anywhere vertically
+        // Define safe spawn areas to avoid platforms including moving platform
+        let x, y;
+        let attempts = 0;
+        let maxAttempts = 20;
+        
+        do {
+            x = Phaser.Math.Between(50, 1400);
+            y = Phaser.Math.Between(50, 350); // Keep stars in upper area to avoid most platforms
+            attempts++;
+            
+            // Check if position conflicts with known platform positions
+            let tooClose = false;
+            
+            // Check against moving platform area (it moves between x=300-516, y=399)
+            if (x >= 280 && x <= 536 && Math.abs(y - 399) < 60) tooClose = true;
+            // Check against platform at (1110, 185)
+            if (Math.abs(x - 1110) < 150 && Math.abs(y - 185) < 50) tooClose = true;
+            // Check against platform at (-50, 150)
+            if (Math.abs(x - (-50)) < 100 && Math.abs(y - 150) < 50) tooClose = true;
+            // Check against platform at (700, 600) - less relevant since we spawn high
+            if (Math.abs(x - 700) < 100 && Math.abs(y - 600) < 50) tooClose = true;
+            // Check against platform at (181, 825) - less relevant since we spawn high
+            if (Math.abs(x - 181) < 100 && Math.abs(y - 825) < 150) tooClose = true;
+            
+            if (!tooClose) break;
+            
+        } while (attempts < maxAttempts);
         
         let star = this.stars.create(x, y, 'star');
         
-        // Flying behavior only starts at level 3
-        if (this.currentLevel >= 3) {
-            // Disable gravity for this star so it truly flies
-            star.body.setGravityY(-500); // Counteract world gravity
-            
-            // Set strong bounce properties for bouncing off platforms and walls
-            star.setBounceY(1.0);
-            star.setBounceX(1.0);
-            
-            // Set flying velocity - stronger movement in all directions
-            star.setVelocityX(Phaser.Math.Between(-150, 150));
-            star.setVelocityY(Phaser.Math.Between(-120, 120));
-            
-            // Enable world bounds collision so stars bounce off screen edges
-            star.setCollideWorldBounds(true);
-            
-            // Add fast rotation for flying effect
-            star.setAngularVelocity(Phaser.Math.Between(-300, 300));
-            
-            // Make stars slightly smaller and more transparent for flying effect
-            star.setScale(0.8);
-            star.setAlpha(0.9);
-        } else {
-            // For levels 1-2, stars are stationary and affected by gravity
-            star.setBounceY(0.7);
-            star.setBounceX(0.2);
-            star.setCollideWorldBounds(true);
-            // Normal size and opacity for stationary stars
-            star.setScale(1.0);
-            star.setAlpha(1.0);
-        }
+        // Simple consistent star behavior - stationary and affected by gravity
+        star.setBounceY(0.7);
+        star.setBounceX(0.2);
+        star.setCollideWorldBounds(true);
+        // Normal size and opacity
+        star.setScale(1.0);
+        star.setAlpha(1.0);
     }
 
     applyLevelChanges() {
-        // Change background asset color based on level
+        // Change background asset color based on level (every 5 levels)
         const colors = [
             0xffffff,
             0xffd700,
-            0xff1493, // level 1: White (normal)
+            0xff1493,
+            0xdc143c,
             0x9370DB,
             0xB03060,
-            0xdc143c, // Level 2: 
-            0x000080  // Level 7+: Navy Blue
+            0xdc143c, 
+            0x000080  
         ];
         
-        const colorIndex = Math.min(this.currentLevel - 1, colors.length - 1);
+        // Calculate color index based on groups of 5 levels
+        const colorIndex = Math.min(Math.floor((this.currentLevel - 1) / 5), colors.length - 1);
         
         // Find the background image and change its tint
         this.children.list.forEach(child => {
@@ -533,26 +487,23 @@ hitBomb (player, bomb){
                 child.setTint(colors[colorIndex]);
             }
         });
-        
-        // Increase gravity slightly each level
-        this.physics.world.gravity.y = 500 + (this.currentLevel * 20);
     }
 
     createBarrierUI() {
-        // Barrier UI - positioned on the left side below score
-        this.barrierLabel = this.add.text(16, 80, 'Barrier:', { fontSize: '20px', fill: '#00ffff'});
+        // Barrier UI - positioned at the bottom left
+        this.barrierLabel = this.add.text(16, 870, 'Barrier:', { fontSize: '20px', fill: '#00ffff'});
         
         // Barrier charge bar background
-        this.barrierBarBg = this.add.rectangle(16, 110, 200, 20, 0x333333);
+        this.barrierBarBg = this.add.rectangle(16, 900, 200, 20, 0x333333);
         this.barrierBarBg.setOrigin(0, 0.5);
         this.barrierBarBg.setStrokeStyle(2, 0x00ffff);
         
         // Barrier charge bar fill
-        this.barrierBarFill = this.add.rectangle(18, 110, 196, 16, 0x00ffff);
+        this.barrierBarFill = this.add.rectangle(18, 900, 196, 16, 0x00ffff);
         this.barrierBarFill.setOrigin(0, 0.5);
         
         // Barrier instruction text
-        this.barrierInstruction = this.add.text(16, 130, 'Press SPACE to activate', { fontSize: '14px', fill: '#ffffff'});
+        this.barrierInstruction = this.add.text(16, 920, 'Press SPACE to activate', { fontSize: '14px', fill: '#ffffff'});
         
         // Initially hide barrier UI
         this.setBarrierUIVisible(false);
@@ -598,81 +549,22 @@ hitBomb (player, bomb){
         // Token UI is hidden during gameplay, only shown in upgrade menu
     }
     
-    // Create time freeze UI
-    createTimeFreezeUI() {
-        // Time freeze UI - positioned on the right side
-        this.timeFreezeLabel = this.add.text(1184, 80, 'Time Freeze:', { fontSize: '20px', fill: '#88ccff'}).setOrigin(1, 0);
-        
-        // Time freeze charge bar background
-        this.timeFreezeBarBg = this.add.rectangle(1184, 110, 200, 20, 0x333333);
-        this.timeFreezeBarBg.setOrigin(1, 0.5);
-        this.timeFreezeBarBg.setStrokeStyle(2, 0x88ccff);
-        
-        // Time freeze charge bar fill
-        this.timeFreezeBarFill = this.add.rectangle(1182, 110, 196, 16, 0x88ccff);
-        this.timeFreezeBarFill.setOrigin(1, 0.5);
-        
-        // Time freeze instruction text
-        this.timeFreezeInstruction = this.add.text(1184, 130, 'Press T to activate', { fontSize: '14px', fill: '#ffffff'}).setOrigin(1, 0);
-        
-        // Initially hide time freeze UI
-        this.setTimeFreezeUIVisible(false);
-    }
-    
-    updateTimeFreezeUI() {
-        if (this.player.abilityRanks.timeFreeze < 1) {
-            this.setTimeFreezeUIVisible(false);
-            return;
-        }
-        
-        this.setTimeFreezeUIVisible(true);
-        
-        // Update charge bar
-        const chargePercent = this.player.timeFreezeCharge / this.player.timeFreezeMaxCharge;
-        this.timeFreezeBarFill.scaleX = chargePercent;
-        
-        // Change color based on charge level
-        if (chargePercent >= 1.0) {
-            this.timeFreezeBarFill.setFillStyle(0x00ff00); // Green when ready
-            this.timeFreezeLabel.setColor('#00ff00');
-            this.timeFreezeInstruction.setText('Press T to activate');
-        } else if (this.player.timeFreezeActive) {
-            this.timeFreezeBarFill.setFillStyle(0xffff00); // Yellow when active
-            this.timeFreezeLabel.setColor('#ffff00');
-            this.timeFreezeInstruction.setText('TIME FROZEN!');
-        } else {
-            this.timeFreezeBarFill.setFillStyle(0xff4444); // Red when charging
-            this.timeFreezeLabel.setColor('#ff4444');
-            this.timeFreezeInstruction.setText('Recharging...');
-        }
-    }
-    
-    setTimeFreezeUIVisible(visible) {
-        if (!this.timeFreezeLabel) {
-            this.createTimeFreezeUI();
-        }
-        this.timeFreezeLabel.setVisible(visible);
-        this.timeFreezeBarBg.setVisible(visible);
-        this.timeFreezeBarFill.setVisible(visible);
-        this.timeFreezeInstruction.setVisible(visible);
-    }
-    
     // Create EMP UI
     createEMPUI() {
-        // EMP UI - positioned below time freeze
-        this.empLabel = this.add.text(1184, 160, 'EMP:', { fontSize: '20px', fill: '#ffff00'}).setOrigin(1, 0);
+        // EMP UI - positioned at the bottom right
+        this.empLabel = this.add.text(1434, 870, 'EMP:', { fontSize: '20px', fill: '#ffff00'}).setOrigin(1, 0);
         
         // EMP charge bar background
-        this.empBarBg = this.add.rectangle(1184, 190, 200, 20, 0x333333);
+        this.empBarBg = this.add.rectangle(1434, 900, 200, 20, 0x333333);
         this.empBarBg.setOrigin(1, 0.5);
         this.empBarBg.setStrokeStyle(2, 0xffff00);
         
         // EMP charge bar fill
-        this.empBarFill = this.add.rectangle(1182, 190, 196, 16, 0xffff00);
+        this.empBarFill = this.add.rectangle(1432, 900, 196, 16, 0xffff00);
         this.empBarFill.setOrigin(1, 0.5);
         
         // EMP instruction text
-        this.empInstructionText = this.add.text(1184, 210, 'Press E to activate', { fontSize: '16px', fill: '#cccccc'}).setOrigin(1, 0);
+        this.empInstructionText = this.add.text(1434, 920, 'Press E to activate', { fontSize: '16px', fill: '#cccccc'}).setOrigin(1, 0);
         
         // Hide UI initially (will be shown when unlocked)
         this.empLabel.setVisible(false);
@@ -690,21 +582,32 @@ hitBomb (player, bomb){
             this.empBarFill.setVisible(true);
             this.empInstructionText.setVisible(true);
             
-            // Update charge bar based on stars collected
-            const chargePercentage = Math.min(this.player.starsCollected / this.player.starsNeededForEMP, 1);
+            // Update charge bar based on star points collected
+            const chargePercentage = Math.min(this.player.starPointsCollected / this.player.starPointsNeededForEMP, 1);
             this.empBarFill.scaleX = chargePercentage;
             
-            // Update text based on availability
-            if (this.player.empAvailable) {
-                this.empLabel.setText('EMP: READY');
+            // Update text based on availability and tier
+            const empTier = this.player.abilityRanks.emp;
+            let delayText = '';
+            if (empTier >= 3) delayText = ' (4s delay)';
+            else if (empTier >= 2) delayText = ' (6s delay)';
+            else delayText = ' (8s delay)';
+            
+            if (this.player.empActive) {
+                this.empLabel.setText(`EMP: ACTIVE${delayText}`);
+                this.empLabel.setTint(0xff00ff);
+                this.empBarFill.setFillStyle(0xff00ff);
+                this.empInstructionText.setText('Bombs will return soon...');
+            } else if (this.player.empAvailable) {
+                this.empLabel.setText(`EMP: READY${delayText}`);
                 this.empLabel.setTint(0x00ff00);
                 this.empBarFill.setFillStyle(0x00ff00);
-                this.empInstructionText.setText('Press E to activate');
+                this.empInstructionText.setText('Press E to destroy all bombs');
             } else {
-                this.empLabel.setText(`EMP: ${this.player.starsCollected}/${this.player.starsNeededForEMP}`);
+                this.empLabel.setText(`EMP: ${this.player.starPointsCollected}/${this.player.starPointsNeededForEMP}${delayText}`);
                 this.empLabel.setTint(0xffff00);
                 this.empBarFill.setFillStyle(0xffff00);
-                this.empInstructionText.setText('Collect stars to charge');
+                this.empInstructionText.setText('Collect star points to charge');
             }
         } else {
             // Hide EMP UI elements when not unlocked
@@ -712,6 +615,82 @@ hitBomb (player, bomb){
             this.empBarBg.setVisible(false);
             this.empBarFill.setVisible(false);
             this.empInstructionText.setVisible(false);
+        }
+    }
+
+    // Create Sonic Boom UI
+    createSonicBoomUI() {
+        // Sonic Boom UI - positioned at the center bottom
+        this.sonicBoomLabel = this.add.text(725, 870, 'Sonic Boom:', { fontSize: '20px', fill: '#ff6600'}).setOrigin(0.5, 0);
+        
+        // Sonic Boom charge bar background
+        this.sonicBoomBarBg = this.add.rectangle(725, 900, 200, 20, 0x333333);
+        this.sonicBoomBarBg.setOrigin(0.5, 0.5);
+        this.sonicBoomBarBg.setStrokeStyle(2, 0xff6600);
+        
+        // Sonic Boom charge bar fill
+        this.sonicBoomBarFill = this.add.rectangle(725, 900, 196, 16, 0xff6600);
+        this.sonicBoomBarFill.setOrigin(0.5, 0.5);
+        
+        // Sonic Boom charges display
+        this.sonicBoomCharges = this.add.text(725, 920, 'Charges: 0', { fontSize: '16px', fill: '#ffaa00'}).setOrigin(0.5, 0);
+        
+        // Sonic Boom instruction text
+        this.sonicBoomInstructionText = this.add.text(725, 940, 'Press Q to throw pulse grenade', { fontSize: '14px', fill: '#cccccc'}).setOrigin(0.5, 0);
+        
+        // Hide UI initially (will be shown when unlocked)
+        this.sonicBoomLabel.setVisible(false);
+        this.sonicBoomBarBg.setVisible(false);
+        this.sonicBoomBarFill.setVisible(false);
+        this.sonicBoomCharges.setVisible(false);
+        this.sonicBoomInstructionText.setVisible(false);
+    }
+    
+    // Update Sonic Boom UI
+    updateSonicBoomUI() {
+        if (this.player.sonicBoomUnlocked) {
+            // Show Sonic Boom UI elements
+            this.sonicBoomLabel.setVisible(true);
+            this.sonicBoomBarBg.setVisible(true);
+            this.sonicBoomBarFill.setVisible(true);
+            this.sonicBoomCharges.setVisible(true);
+            this.sonicBoomInstructionText.setVisible(true);
+            
+            // Update charge bar based on points collected
+            const chargeProgress = this.player.sonicBoomPointsCollected;
+            const chargeNeeded = this.player.sonicBoomPointsNeededForCharge;
+            const chargePercentage = Math.min(chargeProgress / chargeNeeded, 1);
+            this.sonicBoomBarFill.scaleX = chargePercentage;
+            
+            // Update charges display
+            const charges = this.player.getSonicBoomCharges();
+            const tier = this.player.abilityRanks.sonicBoom;
+            let bombsText = '';
+            if (tier === 1) bombsText = ' (1 bomb)';
+            else if (tier === 2) bombsText = ' (2 bombs)';
+            else if (tier === 3) bombsText = ' (3 bombs)';
+            
+            this.sonicBoomCharges.setText(`Charges: ${charges}${bombsText}`);
+            
+            // Update text and colors based on availability
+            if (charges > 0) {
+                this.sonicBoomLabel.setText('Sonic Boom: READY');
+                this.sonicBoomLabel.setTint(0x00ff00);
+                this.sonicBoomBarFill.setFillStyle(0x00ff00); // Green when ready
+                this.sonicBoomInstructionText.setText('Press Q to throw pulse grenade');
+            } else {
+                this.sonicBoomLabel.setText(`Sonic Boom: ${chargeProgress}/${chargeNeeded}`);
+                this.sonicBoomLabel.setTint(0xff6600);
+                this.sonicBoomBarFill.setFillStyle(0xff6600); // Orange when charging
+                this.sonicBoomInstructionText.setText(`Collect ${chargeNeeded - chargeProgress} more points for charge`);
+            }
+        } else {
+            // Hide Sonic Boom UI elements when not unlocked
+            this.sonicBoomLabel.setVisible(false);
+            this.sonicBoomBarBg.setVisible(false);
+            this.sonicBoomBarFill.setVisible(false);
+            this.sonicBoomCharges.setVisible(false);
+            this.sonicBoomInstructionText.setVisible(false);
         }
     }
 
@@ -745,47 +724,49 @@ hitBomb (player, bomb){
         console.log('showUpgradeMenu called for level:', this.currentLevel);
         console.log('Player tokens:', this.player.tokens, 'Special tokens:', this.player.specialTokens);
         
-        // Create upgrade menu background
-        let menuBackground = this.add.rectangle(600, 400, 1100, 650, 0x000000, 0.9);
+        // Create upgrade menu background - full screen
+        let menuBackground = this.add.rectangle(725, 475, 1450, 950, 0x000000, 0.9);
         
         // Title with level info
-        let title = this.add.text(600, 120, `LEVEL ${this.currentLevel} COMPLETE!`, {
+        let title = this.add.text(725, 80, `LEVEL ${this.currentLevel} COMPLETE!`, {
             fontFamily: 'Arial Black',
-            fontSize: 36,
+            fontSize: 42,
             color: '#ffff00',
             stroke: '#000000',
             strokeThickness: 4
         }).setOrigin(0.5);
         
         // Tokens earned notification
-        const tokensEarned = this.currentLevel <= 2 ? 1 : 2;
-        let tokensEarnedText = this.add.text(600, 160, `+${tokensEarned} Token${tokensEarned > 1 ? 's' : ''} Earned!`, {
+        const baseTokens = this.currentLevel <= 2 ? 1 : 2;
+        const bonusTokens = this.player.getBonusTokensPerLevel();
+        const tokensEarned = baseTokens + bonusTokens;
+        let tokensEarnedText = this.add.text(725, 130, `+${tokensEarned} Token${tokensEarned > 1 ? 's' : ''} Earned!${bonusTokens > 0 ? ` (${baseTokens}+${bonusTokens} bonus)` : ''}`, {
             fontFamily: 'Arial Black',
-            fontSize: 24,
+            fontSize: 28,
             color: '#ffff00',
             stroke: '#000000',
             strokeThickness: 3
         }).setOrigin(0.5);
         
         // Current tokens display
-        let currentTokensText = this.add.text(600, 200, `Tokens: ${this.player.tokens}  Special: ${this.player.specialTokens}`, {
+        let currentTokensText = this.add.text(725, 180, `Tokens: ${this.player.tokens}  Special: ${this.player.specialTokens}`, {
             fontFamily: 'Arial Black',
-            fontSize: 20,
+            fontSize: 24,
             color: '#ffffff'
         }).setOrigin(0.5);
         
         // Section headers
-        let regularHeader = this.add.text(300, 250, 'REGULAR UPGRADES', {
+        let regularHeader = this.add.text(450, 250, 'REGULAR UPGRADES', {
             fontFamily: 'Arial Black',
-            fontSize: 24,
+            fontSize: 28,
             color: '#ffff00',
             stroke: '#000000',
             strokeThickness: 3
         }).setOrigin(0.5);
         
-        let premiumHeader = this.add.text(900, 250, '★ PREMIUM UPGRADES ★', {
+        let premiumHeader = this.add.text(1000, 250, '★ PREMIUM UPGRADES ★', {
             fontFamily: 'Arial Black',
-            fontSize: 24,
+            fontSize: 28,
             color: '#ff00ff',
             stroke: '#000000',
             strokeThickness: 3
@@ -815,19 +796,24 @@ hitBomb (player, bomb){
         console.log('createUpgradeCards called');
         
         const regularUpgrades = [
-            { name: 'jump', title: this.player.getJumpUpgradeName(), icon: '⬆', x: 150, y: 350 },
-            { name: 'speed', title: this.player.getSpeedUpgradeName(), icon: '»', x: 300, y: 350 },
-            { name: 'fastFall', title: 'Fast Fall', icon: '⬇', x: 450, y: 350 },
-            { name: 'slowBombs', title: this.player.getSlowBombsUpgradeName(), icon: '🐌', x: 150, y: 500 },
-            { name: 'starMagnet', title: this.player.getStarMagnetUpgradeName(), icon: '🧲', x: 300, y: 500 }
+            { name: 'jump', title: this.player.getJumpUpgradeName(), icon: '⬆', x: 200, y: 350 },
+            { name: 'speed', title: this.player.getSpeedUpgradeName(), icon: '»', x: 350, y: 350 },
+            { name: 'fastFall', title: 'Fast Fall', icon: '⬇', x: 500, y: 350 },
+            { name: 'slowBombs', title: this.player.getSlowBombsUpgradeName(), icon: '🐌', x: 200, y: 500 },
+            { name: 'starMultiplier', title: this.player.getStarMultiplierUpgradeName(), icon: '⭐', x: 200, y: 650 },
+            { name: 'starMagnet', title: this.player.getStarMagnetUpgradeName(), icon: '🧲', x: 350, y: 500 },
+            { name: 'lifeRegen', title: this.player.getLifeRegenUpgradeName(), icon: '♥', x: 500, y: 500 },
+            { name: 'extraLife', title: this.player.getExtraLifeUpgradeName(), icon: '💖', x: 350, y: 650 }
         ];
         
         console.log('Regular upgrades defined:', regularUpgrades);
         
         const premiumUpgrades = [
-            { name: 'barrier', title: 'Barrier', icon: '⦿', x: 750, y: 350 },
-            { name: 'timeFreeze', title: 'Time Freeze', icon: '⏰', x: 900, y: 350 },
-            { name: 'emp', title: 'EMP', icon: '⚡', x: 1050, y: 350 }
+            { name: 'barrier', title: this.player.getBarrierUpgradeName(), icon: '⦿', x: 850, y: 350 },
+            { name: 'emp', title: 'EMP', icon: '⚡', x: 1000, y: 350 },
+            { name: 'sonicBoom', title: this.player.getSonicBoomUpgradeName(), icon: '💥', x: 1150, y: 350 },
+            { name: 'platformDrop', title: this.player.getPlatformDropUpgradeName(), icon: '↕', x: 850, y: 500 },
+            { name: 'tokenBonus', title: this.player.getTokenBonusUpgradeName(), icon: '�', x: 1000, y: 500 }
         ];
         
         console.log('Premium upgrades defined:', premiumUpgrades);
@@ -861,9 +847,8 @@ hitBomb (player, bomb){
         let card = this.add.rectangle(upgrade.x, upgrade.y, cardWidth, cardHeight, canUpgrade ? 0x004488 : 0x333333, 1);
         card.setStrokeStyle(3, isPremium ? 0xff00ff : 0x00ffff);
         
-        if (canUpgrade) {
-            card.setInteractive();
-        }
+        // Make card interactive for all cards (for tooltips)
+        card.setInteractive();
         
         // Icon
         let icon = this.add.text(upgrade.x, upgrade.y - 30, upgrade.icon, {
@@ -879,15 +864,20 @@ hitBomb (player, bomb){
             color: '#ffffff'
         }).setOrigin(0.5);
         
-        // Rank display
-        let rankText = `${currentRank}/${maxRank}`;
-        if (currentRank >= maxRank) rankText = 'MAX';
+        // Rank display (hide for extraLife)
+        let rankText = '';
+        let rank = null;
         
-        let rank = this.add.text(upgrade.x, upgrade.y + 15, rankText, {
-            fontFamily: 'Arial Black',
-            fontSize: 10,
-            color: currentRank >= maxRank ? '#00ff00' : '#ffffff'
-        }).setOrigin(0.5);
+        if (upgrade.name !== 'extraLife') {
+            rankText = `${currentRank}/${maxRank}`;
+            if (currentRank >= maxRank) rankText = 'MAX';
+            
+            rank = this.add.text(upgrade.x, upgrade.y + 15, rankText, {
+                fontFamily: 'Arial Black',
+                fontSize: 10,
+                color: currentRank >= maxRank ? '#00ff00' : '#ffffff'
+            }).setOrigin(0.5);
+        }
         
         // Cost display
         let costText = '';
@@ -929,18 +919,31 @@ hitBomb (player, bomb){
         }
         
         // Store elements
-        this.upgradeMenuElements.push(card, icon, title, rank, costDisplay);
+        let elementsToStore = [card, icon, title, costDisplay];
+        if (rank) elementsToStore.push(rank);
+        this.upgradeMenuElements.push(...elementsToStore);
+        
+        // Add tooltip functionality for all cards (upgradeable or not)
+        const abilityInfo = this.getAbilityDescription(upgrade.name, currentRank);
+        
+        card.on('pointerover', () => {
+            if (canUpgrade) {
+                card.setFillStyle(0x0066aa);
+            }
+            // Show tooltip
+            this.createTooltip(upgrade.x + 60, upgrade.y - 60, abilityInfo.title, abilityInfo.desc);
+        });
+        
+        card.on('pointerout', () => {
+            if (canUpgrade) {
+                card.setFillStyle(0x004488);
+            }
+            // Hide tooltip
+            this.hideTooltip();
+        });
         
         // Button interactions
         if (canUpgrade) {
-            card.on('pointerover', () => {
-                card.setFillStyle(0x0066aa);
-            });
-            
-            card.on('pointerout', () => {
-                card.setFillStyle(0x004488);
-            });
-            
             card.on('pointerdown', () => {
                 this.purchaseUpgrade(upgrade.name);
             });
@@ -948,9 +951,43 @@ hitBomb (player, bomb){
     }
     
     purchaseUpgrade(abilityName) {
+        // Check if this is the first purchase of Life Regen
+        const wasLifeRegenLocked = (abilityName === 'lifeRegen' && this.player.abilityRanks.lifeRegen === 0);
+        
         if (this.player.upgradeAbility(abilityName)) {
+            // Grant an extra life when first purchasing Life Regen
+            if (wasLifeRegenLocked) {
+                this.lives++;
+                this.livesText.setText('Lives: ' + this.lives);
+                
+                // Show special notification for Life Regen unlock + bonus life
+                const bonusLifeText = this.add.text(this.cameras.main.centerX, 150, 'LIFE REGEN UNLOCKED!\n+1 BONUS LIFE!', {
+                    fontFamily: 'Arial Black',
+                    fontSize: 24,
+                    color: '#00ff88',
+                    stroke: '#000000',
+                    strokeThickness: 3,
+                    align: 'center'
+                }).setOrigin(0.5);
+                
+                this.tweens.add({
+                    targets: bonusLifeText,
+                    alpha: 0,
+                    duration: 3000,
+                    ease: 'Power2',
+                    onComplete: () => {
+                        bonusLifeText.destroy();
+                    }
+                });
+            }
+            
             // Update token display
             this.updateTokenUI();
+            
+            // Update star value display if star multiplier was upgraded
+            if (abilityName === 'starMultiplier') {
+                this.starValueText.setText('Star Value: ' + this.player.getStarScoreValue());
+            }
             
             // Refresh the upgrade menu to show new state
             this.refreshUpgradeMenu();
@@ -981,21 +1018,21 @@ hitBomb (player, bomb){
     }
     
     createContinueButton() {
-        // Add Continue button
-        let continueButton = this.add.rectangle(600, 680, 200, 50, 0x00aa00, 1);
+        // Add Continue button - centered at bottom
+        let continueButton = this.add.rectangle(725, 780, 250, 60, 0x00aa00, 1);
         continueButton.setStrokeStyle(3, 0x00ff00);
         continueButton.setInteractive();
         
-        let continueButtonText = this.add.text(600, 680, 'CONTINUE', {
+        let continueButtonText = this.add.text(725, 780, 'CONTINUE', {
             fontFamily: 'Arial Black',
-            fontSize: 20,
+            fontSize: 24,
             color: '#ffffff'
         }).setOrigin(0.5);
         
         // Add ESC to continue instruction
-        let continueText = this.add.text(600, 720, 'Press ESC to continue without upgrading', {
+        let continueText = this.add.text(725, 850, 'Press ESC to continue without upgrading', {
             fontFamily: 'Arial',
-            fontSize: 18,
+            fontSize: 20,
             color: '#cccccc'
         }).setOrigin(0.5);
         
@@ -1024,6 +1061,8 @@ hitBomb (player, bomb){
             if (jumpRank === 1) upgradeDisplayName = 'Double Jump';
             else if (jumpRank === 2) upgradeDisplayName = 'Triple Jump';
             else if (jumpRank === 3) upgradeDisplayName = 'Quad Jump';
+            else if (jumpRank === 4) upgradeDisplayName = 'Penta Jump';
+            else if (jumpRank === 5) upgradeDisplayName = 'Hexa Jump';
             else upgradeDisplayName = 'Jump';
         } else if (abilityName === 'speed') {
             // Get the actual speed upgrade name based on the new rank
@@ -1031,23 +1070,46 @@ hitBomb (player, bomb){
             if (speedRank === 1) upgradeDisplayName = 'Super Speed I';
             else if (speedRank === 2) upgradeDisplayName = 'Super Speed II';
             else if (speedRank === 3) upgradeDisplayName = 'Super Speed III';
+            else if (speedRank === 4) upgradeDisplayName = 'Super Speed IV';
+            else if (speedRank === 5) upgradeDisplayName = 'Super Speed V';
             else upgradeDisplayName = 'Super Speed';
         } else if (abilityName === 'slowBombs') {
             // Get the actual slow bombs upgrade name based on the new rank
             const slowBombsRank = this.player.abilityRanks.slowBombs;
-            const tierNames = ['Slow Bombs I', 'Slow Bombs II', 'Slow Bombs III', 'Slow Bombs IV'];
+            const tierNames = ['Slow Bombs I', 'Slow Bombs II', 'Slow Bombs III', 'Slow Bombs IV', 'Slow Bombs V'];
             upgradeDisplayName = tierNames[slowBombsRank - 1] || 'Slow Bombs';
         } else if (abilityName === 'starMagnet') {
             // Get the actual star magnet upgrade name based on the new rank
             const starMagnetRank = this.player.abilityRanks.starMagnet;
-            const tierNames = ['Star Magnet I', 'Star Magnet II', 'Star Magnet III', 'Star Magnet IV'];
+            const tierNames = ['Star Magnet I', 'Star Magnet II', 'Star Magnet III', 'Star Magnet IV', 'Star Magnet V'];
             upgradeDisplayName = tierNames[starMagnetRank - 1] || 'Star Magnet';
+        } else if (abilityName === 'starMultiplier') {
+            // Get the actual star multiplier upgrade name based on the new rank
+            const starMultiplierRank = this.player.abilityRanks.starMultiplier;
+            if (starMultiplierRank === 1) upgradeDisplayName = 'Star Value +12';
+            else if (starMultiplierRank === 2) upgradeDisplayName = 'Star Value +15';
+            else if (starMultiplierRank === 3) upgradeDisplayName = 'Star Value +18';
+            else upgradeDisplayName = 'Star Value';
+        } else if (abilityName === 'platformDrop') {
+            // Get the actual platform drop upgrade name based on the new rank
+            const platformDropRank = this.player.abilityRanks.platformDrop;
+            if (platformDropRank === 1) upgradeDisplayName = 'Platform Jump';
+            else if (platformDropRank === 2) upgradeDisplayName = 'Platform Drop';
+            else if (platformDropRank === 3) upgradeDisplayName = 'Platform Drop All';
+            else upgradeDisplayName = 'Platform Drop';
+        } else if (abilityName === 'tokenBonus') {
+            // Get the actual token bonus upgrade name based on the new rank
+            const tokenBonusRank = this.player.abilityRanks.tokenBonus;
+            if (tokenBonusRank === 1) upgradeDisplayName = 'Token Bonus +2';
+            else if (tokenBonusRank === 2) upgradeDisplayName = 'Token Bonus +3';
+            else if (tokenBonusRank === 3) upgradeDisplayName = 'Token Bonus +4';
+            else upgradeDisplayName = 'Token Bonus';
         } else {
             const abilityNames = {
-                'fastFall': 'Fast Fall',
+                'fastFall': `Fast Fall ${this.player.abilityRanks.fastFall > 0 ? 'Tier ' + this.player.abilityRanks.fastFall : ''}`,
                 'barrier': 'Barrier',
-                'timeFreeze': 'Time Freeze',
-                'emp': 'EMP'
+                'emp': 'EMP',
+                'extraLife': 'Extra Life'
             };
             upgradeDisplayName = abilityNames[abilityName];
         }
@@ -1080,6 +1142,9 @@ hitBomb (player, bomb){
     }
     
     closeUpgradeMenu() {
+        // Hide any active tooltip
+        this.hideTooltip();
+        
         // Clean up all upgrade menu elements
         if (this.upgradeMenuElements) {
             this.upgradeMenuElements.forEach(element => {
@@ -1129,12 +1194,11 @@ hitBomb (player, bomb){
                 this.cursors.up.isDown = false;
                 this.cursors.down.isDown = false;
                 this.cursors.space.isDown = false;
-                this.cursors.timeFreeze.isDown = false;
                 
                 // Reset key states
                 this.barrierKeyPressed = false;
                 this.jumpKeyPressed = false;
-                this.timeFreezeKeyPressed = false;
+                this.sonicBoomKeyPressed = false;
                 
                 // Increase number of stars based on level for more challenge
                 let numStars = Math.min(12 + Math.floor(this.currentLevel / 2), 20); // Max 20 stars
@@ -1149,4 +1213,231 @@ hitBomb (player, bomb){
         });
     }
 
+    // Tooltip system for upgrade descriptions
+    createTooltip(x, y, title, description) {
+        // Hide any existing tooltip first
+        this.hideTooltip();
+        
+        // Create tooltip background
+        const tooltipWidth = 320;
+        const tooltipHeight = 120;
+        
+        // Adjust position to keep tooltip on screen
+        let adjustedX = x;
+        let adjustedY = y - tooltipHeight - 10;
+        
+        // Keep tooltip within screen bounds
+        if (adjustedX + tooltipWidth > 1450) {
+            adjustedX = 1450 - tooltipWidth - 10;
+        }
+        if (adjustedX < 10) {
+            adjustedX = 10;
+        }
+        if (adjustedY < 10) {
+            adjustedY = y + 70; // Show below if no room above
+        }
+        
+        this.tooltip = this.add.rectangle(adjustedX + tooltipWidth/2, adjustedY + tooltipHeight/2, tooltipWidth, tooltipHeight, 0x000000, 0.95);
+        this.tooltip.setStrokeStyle(3, 0xffffff);
+        this.tooltip.setDepth(1000); // Ensure tooltip appears above everything
+        
+        // Title text
+        this.tooltipTitle = this.add.text(adjustedX + 15, adjustedY + 15, title, {
+            fontFamily: 'Arial Black',
+            fontSize: 16,
+            color: '#ffff00',
+            wordWrap: { width: tooltipWidth - 30 }
+        });
+        this.tooltipTitle.setDepth(1001);
+        
+        // Description text
+        this.tooltipDescription = this.add.text(adjustedX + 15, adjustedY + 40, description, {
+            fontFamily: 'Arial',
+            fontSize: 13,
+            color: '#ffffff',
+            wordWrap: { width: tooltipWidth - 30 }
+        });
+        this.tooltipDescription.setDepth(1001);
+        
+        // Store tooltip elements for cleanup
+        this.tooltipElements = [this.tooltip, this.tooltipTitle, this.tooltipDescription];
+    }
+    
+    hideTooltip() {
+        if (this.tooltipElements) {
+            this.tooltipElements.forEach(element => {
+                if (element && element.destroy) {
+                    element.destroy();
+                }
+            });
+            this.tooltipElements = null;
+        }
+    }
+    
+    getAbilityDescription(abilityName, currentRank) {
+        const descriptions = {
+            jump: {
+                title: 'Multi-Jump',
+                desc: `Allows additional air jumps. Current: ${currentRank === 0 ? 'Ground only' : `${currentRank + 1} total jumps`}. Next: ${currentRank >= 5 ? 'MAX' : `${currentRank + 2} total jumps`}`
+            },
+            speed: {
+                title: 'Super Speed',
+                desc: `Increases movement speed. Current: ${currentRank === 0 ? 'Normal' : `Tier ${currentRank}`}. Next: ${currentRank >= 5 ? 'MAX' : `Tier ${currentRank + 1} speed`}`
+            },
+            fastFall: {
+                title: 'Fast Fall',
+                desc: `Fall faster when holding DOWN. Current: ${currentRank === 0 ? 'Normal fall' : `${800 + currentRank * 100} fall speed`}. Next: ${currentRank >= 5 ? 'MAX' : `${900 + currentRank * 100} fall speed`}`
+            },
+            slowBombs: {
+                title: 'Slow Bombs',
+                desc: `Permanently slows bomb movement. Current: ${currentRank === 0 ? 'Normal bombs' : `${Math.round((1 - [0.75, 0.55, 0.35, 0.20, 0.10][currentRank-1]) * 100)}% slower`}. Next: ${currentRank >= 5 ? 'MAX' : `${Math.round((1 - [0.75, 0.55, 0.35, 0.20, 0.10][currentRank]) * 100)}% slower`}`
+            },
+            starMagnet: {
+                title: 'Star Magnet',
+                desc: `Attracts nearby stars automatically. Current: ${currentRank === 0 ? 'No attraction' : `${[100, 135, 175, 225, 300][currentRank-1]} range`}. Next: ${currentRank >= 5 ? 'MAX' : `${[100, 135, 175, 225, 300][currentRank]} range`}`
+            },
+            starMultiplier: {
+                title: 'Star Value Boost',
+                desc: `Increases points per star collected. Current: ${[9, 12, 15, 18][currentRank]} points per star. Next: ${currentRank >= 3 ? 'MAX' : `${[9, 12, 15, 18][currentRank + 1]} points per star`}`
+            },
+            extraLife: {
+                title: 'Extra Life',
+                desc: 'Immediately grants +1 life. Can be purchased multiple times. No limit!'
+            },
+            barrier: {
+                title: 'Energy Barrier',
+                desc: `Blocks bombs temporarily (SPACE key). Charges with 90 star points. Current: ${currentRank === 0 ? 'Locked' : currentRank === 1 ? '5s duration' : currentRank === 2 ? '7s duration' : '10s duration'}. ${currentRank >= 3 ? 'MAX' : 'Next: Longer duration'}`
+            },
+            emp: {
+                title: 'EMP Blast',
+                desc: `Destroys all bombs (E key). Requires ${[500, 450, 400][Math.min(currentRank, 2)]} star points. Current: ${currentRank === 0 ? 'Locked' : `${[8, 6, 4][currentRank-1]}s delay`}. ${currentRank >= 3 ? 'MAX' : 'Next: Faster recharge'}`
+            },
+            platformDrop: {
+                title: 'Platform Phasing',
+                desc: `Pass through platforms. Current: ${currentRank === 0 ? 'Locked' : currentRank === 1 ? 'Jump up through platforms' : currentRank === 2 ? 'Drop down through platforms (DOWN key)' : 'Drop through ALL platforms'}. ${currentRank >= 3 ? 'MAX' : 'Next: More platform access'}`
+            },
+            tokenBonus: {
+                title: 'Token Bonus',
+                desc: `Extra tokens per level completed. Current: ${currentRank === 0 ? 'No bonus' : `+${[2, 3, 4][currentRank-1]} tokens per level`}. ${currentRank >= 3 ? 'MAX' : `Next: +${[2, 3, 4][currentRank]} tokens per level`}`
+            },
+            sonicBoom: {
+                title: 'Sonic Boom',
+                desc: `Throw pulse grenade to destroy bombs (Q key). Recharges every 600 points. Current: ${currentRank === 0 ? 'Locked' : currentRank === 1 ? 'Destroy 1 bomb per charge' : currentRank === 2 ? 'Destroy 2 bombs per charge' : 'Destroy 3 bombs per charge'}. ${currentRank >= 3 ? 'MAX' : `Next: ${currentRank === 0 ? 'Destroy 1 bomb' : currentRank === 1 ? 'Destroy 2 bombs' : 'Destroy 3 bombs'} per charge`}`
+            },
+            lifeRegen: {
+                title: 'Life Regen',
+                desc: `Regenerate lives by collecting star points. Current: ${currentRank === 0 ? 'Locked' : `${325 - ((currentRank - 1) * 25)} points needed per life`}. ${currentRank >= 5 ? 'MAX' : `Next: ${currentRank === 0 ? '325 points per life' : `${325 - (currentRank * 25)} points per life`}`}`
+            }
+        };
+        
+        return descriptions[abilityName] || { title: 'Unknown', desc: 'No description available.' };
+    }
+
+    // Custom collision process for platform drop ability
+    platformCollisionProcess(player, platform) {
+        // Tier 1: Platform Jump - allows jumping through platforms from below
+        if (this.player.platformJumpUnlocked && 
+            player.body.velocity.y < 0 && // Player is moving upward (jumping)
+            player.body.bottom > platform.body.top) { // Player is coming from below
+            return false; // Don't collide - let player pass through
+        }
+        
+        // Tier 2: Platform Drop - allows dropping through platforms with down key
+        if (this.player.platformDropUnlocked && 
+            this.cursors.down.isDown && // Player is pressing down
+            player.body.velocity.y > 0 && // Player is falling
+            player.y < platform.y) { // Player is above the platform
+            
+            // Check if this is a restricted platform (ground or tall left wall)
+            const isGroundPlatform = Math.abs(platform.y - 950) < 5; // Ground platform at y=950
+            const isTallWallPlatform = Math.abs(platform.y - 825) < 5; // Tall left wall platform at y=825
+            
+            // Tier 3 required: Only allow dropping through ground and tall wall with third upgrade
+            if ((isGroundPlatform || isTallWallPlatform) && !this.player.platformDropAllUnlocked) {
+                return true; // Prevent drop-through for these platforms without tier 3
+            }
+            
+            return false; // Don't collide - let player pass through
+        }
+        
+        return true; // Normal collision (land on top when falling)
+    }
+
+    // Life Regen UI functions
+    createLifeRegenUI() {
+        // Only create if Life Regen is unlocked
+        if (this.player.abilityRanks.lifeRegen === 0) {
+            return;
+        }
+
+        // Create Life Regen meter next to lives counter
+        // Lives counter is at (725, 16), so position Life Regen UI to the left with some spacing
+        const lifeRegenX = 480; // Position further to the left of lives counter
+        const lifeRegenY = 16;
+        
+        // Background for the meter
+        this.lifeRegenBg = this.add.rectangle(lifeRegenX, lifeRegenY + 5, 160, 16, 0x444444);
+        this.lifeRegenBg.setOrigin(0, 0);
+        this.lifeRegenBg.setScrollFactor(0);
+        this.lifeRegenBg.setDepth(1000);
+        this.lifeRegenBg.setStrokeStyle(2, 0xffffff);
+        
+        // Progress bar for the meter
+        this.lifeRegenBar = this.add.rectangle(lifeRegenX + 2, lifeRegenY + 7, 1, 12, 0x00ff88);
+        this.lifeRegenBar.setOrigin(0, 0);
+        this.lifeRegenBar.setScrollFactor(0);
+        this.lifeRegenBar.setDepth(1001);
+        
+        // Label for the meter
+        this.lifeRegenLabel = this.add.text(lifeRegenX, lifeRegenY - 2, 'LIFE REGEN', {
+            fontFamily: 'Arial',
+            fontSize: '10px',
+            color: '#ffffff'
+        });
+        this.lifeRegenLabel.setScrollFactor(0);
+        this.lifeRegenLabel.setDepth(1002);
+    }
+
+    updateLifeRegenUI() {
+        // Only update if Life Regen is unlocked
+        if (this.player.abilityRanks.lifeRegen === 0) {
+            // Hide UI elements if Life Regen is locked
+            if (this.lifeRegenBg) {
+                this.lifeRegenBg.setVisible(false);
+                this.lifeRegenBar.setVisible(false);
+                this.lifeRegenLabel.setVisible(false);
+            }
+            return;
+        }
+
+        // Show UI elements if they exist
+        if (this.lifeRegenBg) {
+            this.lifeRegenBg.setVisible(true);
+            this.lifeRegenBar.setVisible(true);
+            this.lifeRegenLabel.setVisible(true);
+        } else {
+            // Create UI if it doesn't exist and Life Regen is unlocked
+            this.createLifeRegenUI();
+        }
+
+        // Update progress bar
+        if (this.lifeRegenBar) {
+            const progress = this.player.getLifeRegenProgress();
+            const maxWidth = 156; // Adjusted for larger bar (160 - 4 for padding)
+            const currentWidth = Math.max(1, Math.min(maxWidth, maxWidth * (progress.current / progress.needed)));
+            
+            this.lifeRegenBar.setSize(currentWidth, 12);
+            
+            // Change color and label when ready for extra life
+            if (progress.current >= progress.needed) {
+                this.lifeRegenBar.setFillStyle(0xffff00); // Yellow when ready
+                this.lifeRegenLabel.setText('READY!');
+                this.lifeRegenLabel.setColor('#ffff00');
+            } else {
+                this.lifeRegenBar.setFillStyle(0x00ff88); // Green for normal progress
+                this.lifeRegenLabel.setText(`LIFE REGEN (${progress.current}/${progress.needed})`);
+                this.lifeRegenLabel.setColor('#ffffff');
+            }
+        }
+    }
 }
