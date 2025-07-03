@@ -1,51 +1,245 @@
 <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-        <meta name="apple-mobile-web-app-capable" content="yes">
-        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-        <meta name="mobile-web-app-capable" content="yes">
-        <title>BombDrop</title>
-        <style>
-            /* Reset CSS: Please avoid making changes here unless you know what you're doing :) */
-            *,
-            *::before,
-            *::after {
-                margin: 0;
-                padding: 0;
-                box-sizing: border-box;
-            }
-    
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>BombDrop</title>
+    <style>
+        /* Reset CSS: Please avoid making changes here unless you know what you're doing :) */
+        *,
+        *::before,
+        *::after {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden; /* Prevent scrolling on mobile */
+        }
+
+        body {
+            line-height: 1;
+            font-family: Arial, sans-serif;
+            background-color: #040218;
+        }
+        
+        /* Game container takes full screen */
+        #game-container {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #040218;
+        }
+        
+        /* Canvas fills the container */
+        #game-container canvas {
+            width: 100% !important;
+            height: 100% !important;
+            max-width: none !important;
+            max-height: none !important;
+            display: block !important;
+            background-color: #040218 !important;
+        }
+        
+        /* Mobile-specific adjustments */
+        @media (max-width: 768px), (max-height: 768px) {
             html, body {
                 width: 100%;
-                height: 100%;
+                height: 100vh;
+                height: 100dvh; /* Use dynamic viewport height for mobile */
+                margin: 0;
+                padding: 0;
+                overflow: hidden;
+                position: fixed;
+                background-color: #040218;
+                touch-action: manipulation;
+                -webkit-overflow-scrolling: touch;
+                -webkit-user-select: none;
+                user-select: none;
             }
-    
-            body {
-                line-height: 1;
-                font-family: Arial, sans-serif;
+            
+            #game-container {
+                width: 100vw;
+                height: 100vh;
+                height: 100dvh;
+                position: fixed;
+                top: 0;
+                left: 0;
                 background-color: #040218;
             }
-    
-            ol, ul {
-                list-style: none;
+            
+            /* Hide address bar on mobile browsers */
+            @supports (-webkit-touch-callout: none) {
+                html, body {
+                    height: -webkit-fill-available;
+                }
+                
+                #game-container {
+                    height: -webkit-fill-available !important;
+                }
             }
-    
-            img, video {
-                max-width: 100%;
-                height: auto;
-                display: block;
+        }
+
+        ol, ul {
+            list-style: none;
+        }
+
+        img, video {
+            max-width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        a {
+            text-decoration: none;
+            color: inherit;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container"></div>
+    <script>
+        // Enhanced mobile detection
+        function detectMobile() {
+            const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0 || navigator.msMaxTouchPoints > 0;
+            const userAgent = navigator.userAgent || navigator.vendor || window.opera;
+            const isMobileUA = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent);
+            const isSmallScreen = window.innerWidth <= 768 || window.innerHeight <= 768;
+            const hasOrientation = typeof window.orientation !== "undefined";
+            
+            return isMobileUA || hasOrientation || (hasTouch && isSmallScreen);
+        }
+        
+        function setupMobileLayout() {
+            if (detectMobile()) {
+                console.log('Mobile device detected - landscape mode required');
+                document.body.classList.add('mobile-device');
+                
+                // Prevent zoom on double tap
+                document.addEventListener('touchstart', function(event) {
+                    if (event.touches.length > 1) {
+                        event.preventDefault();
+                    }
+                }, { passive: false });
+                
+                let lastTouchEnd = 0;
+                document.addEventListener('touchend', function(event) {
+                    const now = (new Date()).getTime();
+                    if (now - lastTouchEnd <= 300) {
+                        event.preventDefault();
+                    }
+                    lastTouchEnd = now;
+                }, { passive: false });
+                
+                // Prevent context menu and text selection
+                document.addEventListener('contextmenu', function(event) {
+                    event.preventDefault();
+                });
+                
+                document.addEventListener('selectstart', function(event) {
+                    event.preventDefault();
+                });
+            } else {
+                console.log('Desktop device detected');
+                document.body.classList.remove('mobile-device');
             }
-    
-            a {
-                text-decoration: none;
-                color: inherit;
+        }
+        
+        // Set up mobile layout immediately
+        setupMobileLayout();
+        
+        // Handle orientation and resize changes
+        window.addEventListener('orientationchange', function() {
+            setTimeout(function() {
+                setupMobileLayout();
+                // Force viewport refresh
+                window.scrollTo(0, 1);
+                setTimeout(() => window.scrollTo(0, 0), 1);
+            }, 100);
+        });
+        
+        window.addEventListener('resize', function() {
+            setTimeout(setupMobileLayout, 100);
+        });
+        
+        // Force mobile layout setup after page load
+        window.addEventListener('load', function() {
+            setupMobileLayout();
+            // Hide address bar on iOS
+            setTimeout(() => {
+                window.scrollTo(0, 1);
+                setTimeout(() => window.scrollTo(0, 0), 1);
+            }, 500);
+        });
+        
+        document.addEventListener('DOMContentLoaded', setupMobileLayout);
+    </script>
+    <script src="./phaser.js"></script>
+    <script type="module" src="./src/main.js"></script>
+</body>
+</html>
             }
-        </style>
-    </head>
-    <body>
-        <div id="game-container"></div>
+            
+            function setupMobileLayout() {
+                if (detectMobile()) {
+                    console.log('Mobile device detected - setting up mobile layout');
+                    document.body.classList.add('mobile-device');
+                    
+                    const controlsArea = document.querySelector('.mobile-controls-area');
+                    if (controlsArea) {
+                        controlsArea.style.display = 'block';
+                    }
+                    
+                    // Prevent zoom on double tap
+                    document.addEventListener('touchstart', function(event) {
+                        if (event.touches.length > 1) {
+                            event.preventDefault();
+                        }
+                    }, { passive: false });
+                    
+                    let lastTouchEnd = 0;
+                    document.addEventListener('touchend', function(event) {
+                        const now = (new Date()).getTime();
+                        if (now - lastTouchEnd <= 300) {
+                            event.preventDefault();
+                        }
+                        lastTouchEnd = now;
+                    }, { passive: false });
+                } else {
+                    console.log('Desktop device detected');
+                    document.body.classList.remove('mobile-device');
+                    
+                    const controlsArea = document.querySelector('.mobile-controls-area');
+                    if (controlsArea) {
+                        controlsArea.style.display = 'none';
+                    }
+                }
+            }
+            
+            // Set up mobile layout immediately
+            setupMobileLayout();
+            
+            // Handle orientation and resize changes
+            window.addEventListener('orientationchange', function() {
+                setTimeout(setupMobileLayout, 100);
+            });
+            
+            window.addEventListener('resize', function() {
+                setTimeout(setupMobileLayout, 100);
+            });
+            
+            // Force mobile layout setup after page load
+            window.addEventListener('load', setupMobileLayout);
+            document.addEventListener('DOMContentLoaded', setupMobileLayout);
+        </script>
         <script src="./phaser.js"></script>
         <script type="module" src="./src/main.js"></script>
     </body>

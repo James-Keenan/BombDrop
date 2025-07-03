@@ -276,7 +276,9 @@ export class MainMenu extends Phaser.Scene {
     createMiddleSection(centerX) {
         // Dynamic action buttons with enhanced effects
         const startButton = this.createDynamicButton(centerX, 400, 'START GAME', '#ff4466', '#ff6688', () => {
+            console.log('Start button clicked!');
             this.registry.set('selectedCharacter', this.characters[this.selectedCharacterIndex].key);
+            console.log('Selected character:', this.characters[this.selectedCharacterIndex].key);
             this.startGameTransition();
         });
 
@@ -1047,6 +1049,7 @@ export class MainMenu extends Phaser.Scene {
     }
 
     startGameTransition() {
+        console.log('Starting game transition...');
         // Epic transition effect
         const flash = this.add.rectangle(725, 475, 1450, 950, 0x66aaff, 0);
         
@@ -1061,6 +1064,7 @@ export class MainMenu extends Phaser.Scene {
                     alpha: 0,
                     duration: 300,
                     onComplete: () => {
+                        console.log('Transitioning to Game scene...');
                         this.scene.start('Game');
                     }
                 });

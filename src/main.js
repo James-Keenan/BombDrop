@@ -4,6 +4,11 @@ import { GameOver } from './scenes/GameOver.js';
 import { Preloader } from './scenes/Preloader.js';
 import { MainMenu } from './scenes/MainMenu.js';
 
+// Debug logging for mobile setup
+console.log('Game initializing...');
+console.log('Screen dimensions:', window.innerWidth, 'x', window.innerHeight);
+console.log('User agent:', navigator.userAgent);
+
 const config = {
     type: Phaser.AUTO,
     width: 1450,
@@ -25,12 +30,15 @@ const config = {
             height: 240
         },
         max: {
-            width: 1450,
-            height: 950
-        }
+            width: 2000,
+            height: 1500
+        },
+        parent: 'game-container'
     },
     input: {
-        activePointers: 3 // Support multi-touch for mobile devices
+        activePointers: 5, // Support multi-touch for mobile devices
+        touch: true,
+        mouse: true
     },
     scene: [
         Boot,
@@ -41,4 +49,5 @@ const config = {
     ]
 };
 
+console.log('Creating Phaser game with config:', config);
 new Phaser.Game(config);
