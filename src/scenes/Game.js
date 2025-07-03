@@ -1,4 +1,5 @@
 import { Player } from '../Games Objects/player.js';
+import { MobileInputHandler } from '../mobileInputHandler.js';
 
 export class Game extends Phaser.Scene {
     constructor() {
@@ -134,9 +135,28 @@ export class Game extends Phaser.Scene {
         
         // Create mobile UI if on mobile device
         if (this.isMobile) {
-            this.createMobileControls();
+            // this.createMobileControls(); // Removed old mobile controls creation
         }
 
+        // Setup mobile input handler
+        this.mobileInputHandler = new MobileInputHandler(this);
+        
+        // Show mobile controller when level starts
+        if (window.showMobileController && !window.isInUpgradeMode()) {
+            window.showMobileController();
+        }
+        
+        // Show mobile controller for game - use enhanced function
+        if (window.showMobileControllerForGame) {
+            window.showMobileControllerForGame();
+        } else if (window.showMobileController) {
+            window.showMobileController();
+        }
+        
+        // Auto-detect this scene
+        if (window.checkSceneAndUpdateController) {
+            window.checkSceneAndUpdateController('Game');
+        }
     }
 
     update(time) {
@@ -239,6 +259,10 @@ export class Game extends Phaser.Scene {
         // Apply star magnet effect (this needs to be called every frame for smooth movement)
         this.player.applyStarMagnet(this.stars);
 
+        // Update mobile input handler
+        if (this.mobileInputHandler) {
+            this.mobileInputHandler.update();
+        }
     }
 
     collectStar (player, star){
@@ -1602,387 +1626,25 @@ hitBomb (player, bomb){
         return isMobileDevice || (isTouchDevice && isSmallScreen);
     }
     
-    // Create mobile touch controls with gamepad design
-    createMobileControls() {
-        console.log('Creating gamepad-style mobile controls...');
-        
-        // Show the mobile controls area
-        const controlsArea = document.querySelector('.mobile-controls-area');
-        if (controlsArea) {
-            controlsArea.style.display = 'block';
-            console.log('Mobile controls area shown');
+    // When level ends or scene changes
+    shutdown() {
+        // Hide mobile controller when leaving game
+        if (window.hideMobileController) {
+            window.hideMobileController();
         }
         
-        // Get current camera dimensions
-        const camera = this.cameras.main;
-        const gameWidth = camera.width;
-        const gameHeight = camera.height;
-        
-        console.log('Game dimensions:', gameWidth, 'x', gameHeight);
-        console.log('Screen dimensions:', window.innerWidth, 'x', window.innerHeight);
-        
-        // Convert screen coordinates to game coordinates for the controller area
-        const screenWidth = window.innerWidth;
-        const screenHeight = window.innerHeight;
-        const controllerHeight = 220;
-        
-        // Scale factor for positioning controls in game coordinates
-        const scaleX = gameWidth / screenWidth;
-        const scaleY = gameHeight / (screenHeight - controllerHeight);
-        
-        // Gamepad-style button layout
-        const buttonSizes = {
-            dpad: 45,        // D-pad buttons
-            action: 50,      // Action buttons (A, B, X, Y style)
-            shoulder: 35,    // Shoulder buttons
-            stick: 60        // Analog stick area
-        };
-        
-        // Controller layout positions (in game coordinates)
-        const layout = {
-            // Left side - D-pad area
-            dpadCenter: { x: gameWidth * 0.15, y: gameHeight - 60 },
-            
-            // Right side - Action buttons area  
-            actionCenter: { x: gameWidth * 0.85, y: gameHeight - 60 },
-            
-            // Top shoulder buttons
-            shoulderY: gameHeight - 140,
-            leftShoulder: gameWidth * 0.25,
-            rightShoulder: gameWidth * 0.75
-        };
-        
-        // Enhanced gamepad button styling
-        const styles = {
-            dpad: {
-                fillColor: 0x2d3748,
-                strokeColor: 0x4a5568,
-                strokeWidth: 3,
-                alpha: 0.95
-            },
-            action: {
-                fillColor: 0x4a5568,
-                strokeColor: 0x718096,
-                strokeWidth: 3,
-                alpha: 0.95
-            },
-            shoulder: {
-                fillColor: 0x1a202c,
-                strokeColor: 0x2d3748,
-                strokeWidth: 2,
-                alpha: 0.9
-            }
-        };
-        
-        const textStyles = {
-            dpad: {
-                fontFamily: 'Arial Black',
-                fontSize: '24px',
-                color: '#e2e8f0',
-                stroke: '#1a202c',
-                strokeThickness: 2
-            },
-            action: {
-                fontFamily: 'Arial Black',
-                fontSize: '18px',
-                color: '#ffffff',
-                stroke: '#000000',
-                strokeThickness: 2
-            },
-            shoulder: {
-                fontFamily: 'Arial Black',
-                fontSize: '14px',
-                color: '#cbd5e0',
-                stroke: '#1a202c',
-                strokeThickness: 1
-            }
-        };
-        
-        // === LEFT SIDE: D-PAD CONTROLS ===
-        
-        // Left D-pad button
-        this.leftButton = this.add.circle(
-            layout.dpadCenter.x - 60, 
-            layout.dpadCenter.y, 
-            buttonSizes.dpad, 
-            styles.dpad.fillColor, 
-            styles.dpad.alpha
-        );
-        this.leftButton.setStrokeStyle(styles.dpad.strokeWidth, styles.dpad.strokeColor);
-        this.leftButton.setScrollFactor(0);
-        this.leftButton.setDepth(4000);
-        this.leftButton.setInteractive();
-        
-        this.leftButtonText = this.add.text(layout.dpadCenter.x - 60, layout.dpadCenter.y, '◀', textStyles.dpad);
-        this.leftButtonText.setOrigin(0.5);
-        this.leftButtonText.setScrollFactor(0);
-        this.leftButtonText.setDepth(4001);
-        
-        // Right D-pad button
-        this.rightButton = this.add.circle(
-            layout.dpadCenter.x + 60, 
-            layout.dpadCenter.y, 
-            buttonSizes.dpad, 
-            styles.dpad.fillColor, 
-            styles.dpad.alpha
-        );
-        this.rightButton.setStrokeStyle(styles.dpad.strokeWidth, styles.dpad.strokeColor);
-        this.rightButton.setScrollFactor(0);
-        this.rightButton.setDepth(4000);
-        this.rightButton.setInteractive();
-        
-        this.rightButtonText = this.add.text(layout.dpadCenter.x + 60, layout.dpadCenter.y, '▶', textStyles.dpad);
-        this.rightButtonText.setOrigin(0.5);
-        this.rightButtonText.setScrollFactor(0);
-        this.rightButtonText.setDepth(4001);
-        
-        // Down D-pad button
-        this.downButton = this.add.circle(
-            layout.dpadCenter.x, 
-            layout.dpadCenter.y + 60, 
-            buttonSizes.dpad * 0.8, 
-            styles.dpad.fillColor, 
-            styles.dpad.alpha
-        );
-        this.downButton.setStrokeStyle(styles.dpad.strokeWidth, styles.dpad.strokeColor);
-        this.downButton.setScrollFactor(0);
-        this.downButton.setDepth(4000);
-        this.downButton.setInteractive();
-        
-        this.downButtonText = this.add.text(layout.dpadCenter.x, layout.dpadCenter.y + 60, '⬇', {
-            fontFamily: 'Arial Black',
-            fontSize: '20px',
-            color: '#e2e8f0',
-            stroke: '#1a202c',
-            strokeThickness: 2
-        });
-        this.downButtonText.setOrigin(0.5);
-        this.downButtonText.setScrollFactor(0);
-        this.downButtonText.setDepth(4001);
-        
-        // === RIGHT SIDE: ACTION BUTTONS ===
-        
-        // Jump button (main action - larger)
-        this.jumpButton = this.add.circle(
-            layout.actionCenter.x, 
-            layout.actionCenter.y - 30, 
-            buttonSizes.action, 
-            0x38a169, 
-            styles.action.alpha
-        );
-        this.jumpButton.setStrokeStyle(styles.action.strokeWidth, 0x48bb78);
-        this.jumpButton.setScrollFactor(0);
-        this.jumpButton.setDepth(4000);
-        this.jumpButton.setInteractive();
-        
-        this.jumpButtonText = this.add.text(layout.actionCenter.x, layout.actionCenter.y - 30, 'A', {
-            fontFamily: 'Arial Black',
-            fontSize: '24px',
-            color: '#ffffff',
-            stroke: '#000000',
-            strokeThickness: 2
-        });
-        this.jumpButtonText.setOrigin(0.5);
-        this.jumpButtonText.setScrollFactor(0);
-        this.jumpButtonText.setDepth(4001);
-        
-        // === SHOULDER BUTTONS: ABILITIES ===
-        
-        // Left shoulder - Barrier
-        this.barrierButton = this.add.ellipse(
-            layout.leftShoulder, 
-            layout.shoulderY, 
-            buttonSizes.shoulder * 2, 
-            buttonSizes.shoulder, 
-            0x3182ce, 
-            styles.shoulder.alpha
-        );
-        this.barrierButton.setStrokeStyle(styles.shoulder.strokeWidth, 0x4299e1);
-        this.barrierButton.setScrollFactor(0);
-        this.barrierButton.setDepth(4000);
-        this.barrierButton.setInteractive();
-        
-        this.barrierButtonText = this.add.text(layout.leftShoulder, layout.shoulderY, 'L1\nBARRIER', {
-            fontFamily: 'Arial Black',
-            fontSize: '12px',
-            color: '#ffffff',
-            stroke: '#000000',
-            strokeThickness: 1,
-            align: 'center'
-        });
-        this.barrierButtonText.setOrigin(0.5);
-        this.barrierButtonText.setScrollFactor(0);
-        this.barrierButtonText.setDepth(4001);
-        
-        // Middle shoulder - EMP
-        this.empButton = this.add.ellipse(
-            gameWidth * 0.5, 
-            layout.shoulderY, 
-            buttonSizes.shoulder * 2, 
-            buttonSizes.shoulder, 
-            0xe53e3e, 
-            styles.shoulder.alpha
-        );
-        this.empButton.setStrokeStyle(styles.shoulder.strokeWidth, 0xf56565);
-        this.empButton.setScrollFactor(0);
-        this.empButton.setDepth(4000);
-        this.empButton.setInteractive();
-        
-        this.empButtonText = this.add.text(gameWidth * 0.5, layout.shoulderY, 'L2\nEMP', {
-            fontFamily: 'Arial Black',
-            fontSize: '12px',
-            color: '#ffffff',
-            stroke: '#000000',
-            strokeThickness: 1,
-            align: 'center'
-        });
-        this.empButtonText.setOrigin(0.5);
-        this.empButtonText.setScrollFactor(0);
-        this.empButtonText.setDepth(4001);
-        
-        // Right shoulder - Sonic Boom
-        this.sonicBoomButton = this.add.ellipse(
-            layout.rightShoulder, 
-            layout.shoulderY, 
-            buttonSizes.shoulder * 2, 
-            buttonSizes.shoulder, 
-            0xd69e2e, 
-            styles.shoulder.alpha
-        );
-        this.sonicBoomButton.setStrokeStyle(styles.shoulder.strokeWidth, 0xecc94b);
-        this.sonicBoomButton.setScrollFactor(0);
-        this.sonicBoomButton.setDepth(4000);
-        this.sonicBoomButton.setInteractive();
-        
-        this.sonicBoomButtonText = this.add.text(layout.rightShoulder, layout.shoulderY, 'R1\nSONIC', {
-            fontFamily: 'Arial Black',
-            fontSize: '12px',
-            color: '#ffffff',
-            stroke: '#000000',
-            strokeThickness: 1,
-            align: 'center'
-        });
-        this.sonicBoomButtonText.setOrigin(0.5);
-        this.sonicBoomButtonText.setScrollFactor(0);
-        this.sonicBoomButtonText.setDepth(4001);
-        
-        // === CONTROLLER DECORATION ===
-        
-        // D-pad center
-        const dpadCenter = this.add.circle(layout.dpadCenter.x, layout.dpadCenter.y, 15, 0x1a202c, 0.8);
-        dpadCenter.setScrollFactor(0);
-        dpadCenter.setDepth(3999);
-        
-        // Action button center
-        const actionCenter = this.add.circle(layout.actionCenter.x, layout.actionCenter.y, 20, 0x1a202c, 0.8);
-        actionCenter.setScrollFactor(0);
-        actionCenter.setDepth(3999);
-        
-        console.log('Gamepad-style mobile controls created successfully');
-        
-        // Setup touch controls
-        this.setupMobileTouchControls();
+        // Clean up mobile input handler
+        if (this.mobileInputHandler) {
+            this.mobileInputHandler.destroy();
+        }
     }
 
-    // Setup mobile touch control events
-    setupMobileTouchControls() {
-        // Left D-pad button
-        this.leftButton.on('pointerdown', () => {
-            this.virtualControls.left = true;
-            this.leftButton.setFillStyle(0x4a5568);
-        });
-        this.leftButton.on('pointerup', () => {
-            this.virtualControls.left = false;
-            this.leftButton.setFillStyle(0x2d3748);
-        });
-        this.leftButton.on('pointerout', () => {
-            this.virtualControls.left = false;
-            this.leftButton.setFillStyle(0x2d3748);
-        });
+    destroy() {
+        // Hide mobile controller when scene is destroyed
+        if (window.hideMobileController) {
+            window.hideMobileController();
+        }
         
-        // Right D-pad button
-        this.rightButton.on('pointerdown', () => {
-            this.virtualControls.right = true;
-            this.rightButton.setFillStyle(0x4a5568);
-        });
-        this.rightButton.on('pointerup', () => {
-            this.virtualControls.right = false;
-            this.rightButton.setFillStyle(0x2d3748);
-        });
-        this.rightButton.on('pointerout', () => {
-            this.virtualControls.right = false;
-            this.rightButton.setFillStyle(0x2d3748);
-        });
-        
-        // Jump button (Action A)
-        this.jumpButton.on('pointerdown', () => {
-            this.virtualControls.jump = true;
-            this.jumpButton.setFillStyle(0x48bb78);
-        });
-        this.jumpButton.on('pointerup', () => {
-            this.virtualControls.jump = false;
-            this.jumpButton.setFillStyle(0x38a169);
-        });
-        this.jumpButton.on('pointerout', () => {
-            this.virtualControls.jump = false;
-            this.jumpButton.setFillStyle(0x38a169);
-        });
-        
-        // Down D-pad button
-        this.downButton.on('pointerdown', () => {
-            this.virtualControls.down = true;
-            this.downButton.setFillStyle(0x4a5568);
-        });
-        this.downButton.on('pointerup', () => {
-            this.virtualControls.down = false;
-            this.downButton.setFillStyle(0x2d3748);
-        });
-        this.downButton.on('pointerout', () => {
-            this.virtualControls.down = false;
-            this.downButton.setFillStyle(0x2d3748);
-        });
-        
-        // Barrier button (L1)
-        this.barrierButton.on('pointerdown', () => {
-            this.virtualControls.barrier = true;
-            this.barrierButton.setFillStyle(0x4299e1);
-        });
-        this.barrierButton.on('pointerup', () => {
-            this.virtualControls.barrier = false;
-            this.barrierButton.setFillStyle(0x3182ce);
-        });
-        this.barrierButton.on('pointerout', () => {
-            this.virtualControls.barrier = false;
-            this.barrierButton.setFillStyle(0x3182ce);
-        });
-        
-        // EMP button (L2)
-        this.empButton.on('pointerdown', () => {
-            this.virtualControls.emp = true;
-            this.empButton.setFillStyle(0xf56565);
-        });
-        this.empButton.on('pointerup', () => {
-            this.virtualControls.emp = false;
-            this.empButton.setFillStyle(0xe53e3e);
-        });
-        this.empButton.on('pointerout', () => {
-            this.virtualControls.emp = false;
-            this.empButton.setFillStyle(0xe53e3e);
-        });
-        
-        // Sonic Boom button (R1)
-        this.sonicBoomButton.on('pointerdown', () => {
-            this.virtualControls.sonicBoom = true;
-            this.sonicBoomButton.setFillStyle(0xecc94b);
-        });
-        this.sonicBoomButton.on('pointerup', () => {
-            this.virtualControls.sonicBoom = false;
-            this.sonicBoomButton.setFillStyle(0xd69e2e);
-        });
-        this.sonicBoomButton.on('pointerout', () => {
-            this.virtualControls.sonicBoom = false;
-            this.sonicBoomButton.setFillStyle(0xd69e2e);
-        });
+        // ...existing code...
     }
-
 }

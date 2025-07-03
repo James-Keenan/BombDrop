@@ -17,6 +17,8 @@ export class GameOver extends Phaser.Scene {
         const highScore = localStorage.getItem('highScore') || 0;
         const highestLevel = localStorage.getItem('highestLevel') || 1;
 
+        const textScale = window.getMobileTextScale ? window.getMobileTextScale() : 1;
+
         // Game Over title
         this.add.text(725, 220, 'Game Over', {
             fontFamily: 'Arial Black', 
@@ -73,6 +75,29 @@ export class GameOver extends Phaser.Scene {
             fontSize: 24, 
             color: '#ffffff',
             align: 'center'
+        }).setOrigin(0.5);
+
+        // Game Over text with mobile scaling
+        this.add.text(this.cameras.main.centerX, 200, 'Game Over!', {
+            fontSize: `${Math.floor(64 * textScale)}px`,
+            fontFamily: 'Arial, sans-serif',
+            color: '#ff0000',
+            stroke: '#000000',
+            strokeThickness: 4
+        }).setOrigin(0.5);
+        
+        // Score text with mobile scaling
+        this.add.text(this.cameras.main.centerX, 300, `Final Score: ${finalScore}`, {
+            fontSize: `${Math.floor(32 * textScale)}px`,
+            fontFamily: 'Arial, sans-serif',
+            color: '#ffffff'
+        }).setOrigin(0.5);
+        
+        // Instructions with mobile scaling
+        this.add.text(this.cameras.main.centerX, 400, 'Tap to continue', {
+            fontSize: `${Math.floor(24 * textScale)}px`,
+            fontFamily: 'Arial, sans-serif',
+            color: '#ffff00'
         }).setOrigin(0.5);
 
         // Input handling - only space key to return to main menu

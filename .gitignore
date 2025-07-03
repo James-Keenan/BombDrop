@@ -30,3 +30,9 @@ build/
 .env.development.local
 .env.test.local
 .env.production.local
+
+# GitHub Pages
+_site/
+.sass-cache/
+.jekyll-cache/
+.jekyll-metadata

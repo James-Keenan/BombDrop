@@ -123,11 +123,6 @@
                 display: flex;
             }
             
-            /* Force hide controller during upgrades */
-            .mobile-controller.upgrade-mode {
-                display: none !important;
-            }
-            
             /* Left side controls */
             .controller-left {
                 display: flex;
@@ -316,55 +311,6 @@
             text-decoration: none;
             color: inherit;
         }
-
-        /* Mobile upgrade UI improvements */
-        @media (max-width: 768px), (max-height: 768px) {
-            /* Make all game text larger on mobile */
-            .phaser-game-object {
-                transform: scale(1.2);
-            }
-            
-            /* Target upgrade text specifically */
-            canvas {
-                font-size: 24px !important;
-            }
-        }
-        
-        /* Mobile-specific text scaling for Phaser game content */
-        @media (max-width: 768px), (max-height: 768px) {
-            body.mobile-device {
-                /* Increase overall text rendering scale */
-                text-size-adjust: 150%;
-                -webkit-text-size-adjust: 150%;
-                -moz-text-size-adjust: 150%;
-                -ms-text-size-adjust: 150%;
-            }
-            
-            /* Scale game canvas text elements */
-            #game-container {
-                font-size: 18px;
-                line-height: 1.4;
-            }
-            
-            /* Ensure touch targets are larger */
-            * {
-                min-height: 44px;
-                min-width: 44px;
-            }
-        }
-        
-        /* Debug styles - remove in production */
-        #debug-info {
-            position: fixed;
-            top: 10px;
-            left: 10px;
-            background: rgba(0, 0, 0, 0.7);
-            color: white;
-            padding: 10px;
-            font-size: 14px;
-            z-index: 1000;
-            border-radius: 8px;
-        }
     </style>
 </head>
 <body>
@@ -420,12 +366,11 @@
         window.showMobileController = function() {
             if (detectMobile()) {
                 const controller = document.querySelector('.mobile-controller');
-                if (controller && !controller.classList.contains('upgrade-mode')) {
+                if (controller) {
                     controller.classList.add('game-active');
                     console.log('Mobile controller shown');
+                    // Ensure controllers are set up when shown
                     setupMobileControllers();
-                } else {
-                    console.log('Mobile controller NOT shown - in upgrade mode');
                 }
             }
         };
@@ -434,86 +379,9 @@
             const controller = document.querySelector('.mobile-controller');
             if (controller) {
                 controller.classList.remove('game-active');
-                controller.classList.remove('upgrade-mode');
                 console.log('Mobile controller hidden');
             }
         };
-        
-        // Hide controller during upgrade screens
-        window.hideMobileControllerForUpgrades = function() {
-            const controller = document.querySelector('.mobile-controller');
-            if (controller) {
-                controller.classList.remove('game-active');
-                controller.classList.add('upgrade-mode');
-                console.log('Mobile controller hidden for upgrades');
-            }
-        };
-        
-        // Show controller after upgrades
-        window.showMobileControllerAfterUpgrades = function() {
-            const controller = document.querySelector('.mobile-controller');
-            if (controller && detectMobile()) {
-                controller.classList.remove('upgrade-mode');
-                controller.classList.add('game-active');
-                console.log('Mobile controller shown after upgrades');
-                setupMobileControllers();
-            }
-        };
-        
-        // Check if currently in upgrade mode
-        window.isInUpgradeMode = function() {
-            const controller = document.querySelector('.mobile-controller');
-            return controller && controller.classList.contains('upgrade-mode');
-        };
-        
-        // Enhanced show function that handles upgrades automatically
-        window.showMobileControllerForGame = function() {
-            const controller = document.querySelector('.mobile-controller');
-            if (controller && detectMobile()) {
-                // Remove upgrade mode and show for game
-                controller.classList.remove('upgrade-mode');
-                controller.classList.add('game-active');
-                console.log('Mobile controller shown for game');
-                setupMobileControllers();
-            }
-        };
-        
-        // Auto-detect scene changes and show/hide controller appropriately
-        window.checkSceneAndUpdateController = function(sceneName) {
-            console.log('Scene changed to:', sceneName);
-            
-            if (detectMobile()) {
-                const controller = document.querySelector('.mobile-controller');
-                if (!controller) return;
-                
-                if (sceneName === 'Game' || sceneName === 'GameScene') {
-                    // Show controller for game scenes
-                    controller.classList.remove('upgrade-mode');
-                    controller.classList.add('game-active');
-                    setupMobileControllers();
-                    console.log('Controller shown for game scene');
-                } else if (sceneName === 'CharacterSelect' || sceneName === 'Upgrade' || sceneName === 'UpgradeScene') {
-                    // Hide controller for upgrade scenes
-                    controller.classList.remove('game-active');
-                    controller.classList.add('upgrade-mode');
-                    console.log('Controller hidden for upgrade scene');
-                } else {
-                    // Hide controller for other scenes (menu, etc.)
-                    controller.classList.remove('game-active');
-                    controller.classList.remove('upgrade-mode');
-                    console.log('Controller hidden for other scene');
-                }
-            }
-        };
-        
-        // Force hide controller immediately when page loads
-        window.addEventListener('DOMContentLoaded', function() {
-            const controller = document.querySelector('.mobile-controller');
-            if (controller) {
-                controller.classList.add('upgrade-mode');
-                console.log('Controller initially hidden');
-            }
-        });
         
         function setupMobileLayout() {
             if (detectMobile()) {
@@ -723,9 +591,7 @@
             };
         }
         
-        // Remove the auto-show controller for testing
-        // This was causing the controller to appear everywhere
-        /*
+        // Auto-show controller for testing on mobile
         window.addEventListener('load', function() {
             setTimeout(function() {
                 if (detectMobile()) {
@@ -734,41 +600,6 @@
                 }
             }, 3000);
         });
-        */
-        
-        // Add mobile text scaling for Phaser
-        window.getMobileTextScale = function() {
-            if (detectMobile()) {
-                return 1.5; // 50% larger text on mobile
-            }
-            return 1;
-        };
-        
-        // Add mobile UI scaling
-        window.getMobileUIScale = function() {
-            if (detectMobile()) {
-                return 1.3; // 30% larger UI elements on mobile
-            }
-            return 1;
-        };
-        
-        // Function to apply mobile text styling to Phaser scenes
-        window.applyMobileTextStyling = function(textObject) {
-            if (detectMobile() && textObject) {
-                const scale = window.getMobileTextScale();
-                if (textObject.setScale) {
-                    textObject.setScale(scale);
-                }
-                if (textObject.setFontSize) {
-                    const currentSize = textObject.style?.fontSize || 16;
-                    textObject.setFontSize(Math.floor(currentSize * scale));
-                }
-                if (textObject.setLineSpacing) {
-                    textObject.setLineSpacing(6);
-                }
-            }
-            return textObject;
-        };
     </script>
     <script src="./phaser.js"></script>
     <script type="module" src="./src/main.js"></script>
