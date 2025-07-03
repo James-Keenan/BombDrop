@@ -166,11 +166,11 @@
                 right: 20px;
             }
             
-            /* Premium ability buttons - larger circular */
+            /* Premium ability buttons - smaller circular */
             .ability-btn {
-                width: 60px;
-                height: 60px;
-                font-size: 24px;
+                width: 45px;
+                height: 45px;
+                font-size: 18px;
                 border-radius: 50%;
                 border: 2px solid rgba(255, 255, 255, 0.5);
                 text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
@@ -193,12 +193,18 @@
                 border-radius: 50%;
             }
             
-            /* Jump button - larger size */
+            .zero-gravity-btn {
+                background: linear-gradient(135deg, rgba(138, 43, 226, 0.8), rgba(75, 0, 130, 0.8));
+                border-radius: 50%;
+            }
+            
+            /* Jump button - larger size with text */
             .jump-btn {
                 width: 70px;
                 height: 70px;
                 background: linear-gradient(135deg, #50c878, #3da55c);
-                font-size: 26px;
+                font-size: 14px;
+                font-weight: bold;
                 border-radius: 50%;
                 border: 2px solid rgba(255, 255, 255, 0.3);
             }
@@ -265,6 +271,31 @@
             z-index: 1000;
             border-radius: 8px;
         }
+        
+        /* Disabled button styling - greyed out locked items */
+        .control-btn:disabled {
+            opacity: 0.3;
+            background: linear-gradient(135deg, #666, #555) !important;
+            cursor: not-allowed;
+            color: #999 !important;
+            text-shadow: none !important;
+        }
+        
+        /* Fast fall button - disabled state */
+        .fast-fall-btn:disabled {
+            background: linear-gradient(135deg, #666, #555) !important;
+            opacity: 0.3;
+            color: #999 !important;
+        }
+        
+        /* Premium ability buttons when disabled - greyed out */
+        .ability-btn:disabled {
+            background: linear-gradient(135deg, #666, #555) !important;
+            opacity: 0.3;
+            color: #999 !important;
+            text-shadow: none !important;
+            border: 2px solid rgba(150, 150, 150, 0.3) !important;
+        }
     </style>
 </head>
 <body>
@@ -275,7 +306,7 @@
         <!-- Top Row - Main Movement Buttons -->
         <div class="controller-center-row">
             <button class="control-btn move-btn" id="move-left">←</button>
-            <button class="control-btn jump-btn" id="jump">↑</button>
+            <button class="control-btn jump-btn" id="jump">JUMP</button>
             <button class="control-btn move-btn" id="move-right">→</button>
         </div>
         
@@ -287,6 +318,9 @@
                 </button>
                 <button class="control-btn ability-btn emp-btn" id="emp" disabled>
                     ⚡
+                </button>
+                <button class="control-btn ability-btn zero-gravity-btn" id="zero-gravity" disabled>
+                    🌌
                 </button>
             </div>
             
@@ -493,7 +527,8 @@
                 { id: 'fast-fall', key: 40, name: 'Fast Fall', continuous: true },
                 { id: 'barrier', key: 87, name: 'Barrier', continuous: false }, // W key
                 { id: 'emp', key: 69, name: 'EMP', continuous: false }, // E key  
-                { id: 'sonic', key: 81, name: 'Sonic', continuous: false } // Q key
+                { id: 'sonic', key: 81, name: 'Sonic', continuous: false }, // Q key
+                { id: 'zero-gravity', key: 82, name: 'Zero Gravity', continuous: false } // R key
             ];
             
             buttonConfigs.forEach(({ id, key, name, continuous }) => {
@@ -629,7 +664,9 @@
                 'shield': 'barrier',
                 'shield barrier': 'barrier',
                 'sonic': 'sonic',
-                'sonic boom': 'sonic'
+                'sonic boom': 'sonic',
+                'zero gravity': 'zero-gravity',
+                'zerogravity': 'zero-gravity'
             };
             
             const buttonId = buttonMap[powerUpName.toLowerCase()];
@@ -671,6 +708,12 @@
                     button.style.textShadow = '0 1px 3px rgba(0, 0, 0, 0.8)';
                     button.style.color = '#ffffff';
                     button.style.fontWeight = 'bold';
+                } else if (buttonId === 'zero-gravity') {
+                    button.style.background = 'linear-gradient(135deg, rgba(138, 43, 226, 0.8), rgba(75, 0, 130, 0.8))';
+                    button.style.border = '2px solid rgba(255, 255, 255, 0.5)';
+                    button.style.textShadow = '0 1px 3px rgba(0, 0, 0, 0.8)';
+                    button.style.color = '#ffffff';
+                    button.style.fontWeight = 'bold';
                 }
                 
                 console.log(`${powerUpName} mobile button unlocked and styled!`);
@@ -690,7 +733,8 @@
                 'down fall': 'fast fall',
                 'emp blast': 'emp',
                 'shield barrier': 'barrier',
-                'sonic boom': 'sonic'
+                'sonic boom': 'sonic',
+                'zero gravity': 'zero gravity'
             };
             
             const mobileUpgrade = mobileMappings[upgradeName.toLowerCase()];
@@ -751,6 +795,7 @@
             window.unlockMobilePowerUp('emp');
             window.unlockMobilePowerUp('barrier');
             window.unlockMobilePowerUp('sonic');
+            window.unlockMobilePowerUp('zero gravity');
         };
         
         // Test function that forces Fast Fall unlock
@@ -829,6 +874,11 @@
             window.unlockMobilePowerUp('emp');
         };
         
+        window.testUnlockZeroGravity = function() {
+            console.log('Testing Zero Gravity unlock...');
+            window.unlockMobilePowerUp('zero gravity');
+        };
+        
         // Test all abilities at once
         window.testUnlockAllAbilities = function() {
             console.log('Unlocking all mobile abilities...');
@@ -836,6 +886,7 @@
             window.unlockMobilePowerUp('barrier');
             window.unlockMobilePowerUp('emp');
             window.unlockMobilePowerUp('sonic');
+            window.unlockMobilePowerUp('zero gravity');
         };
         
         // Test EMP specifically

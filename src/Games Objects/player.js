@@ -76,7 +76,8 @@ export class Player extends Phaser.Physics.Arcade.Sprite
             starMultiplier: 0, // 0=locked, 1=2x score, 2=3x score, 3=4x score
             extraLife: 0,   // 0=locked, can buy multiple times
             sonicBoom: 0,   // 0=locked, 1=1 bomb for 1 token, 2=2 bombs for 5 tokens, 3=3 bombs for 10 tokens
-            lifeRegen: 0    // 0=locked, 1-5=regenerate lives (325, 300, 275, 250, 225 points needed)
+            lifeRegen: 0,   // 0=locked, 1-5=regenerate lives (325, 300, 275, 250, 225 points needed)
+            zeroGravity: 0  // 0=locked, 1-5=zero gravity tiers
         };
         
         // EMP ability properties
@@ -99,6 +100,20 @@ export class Player extends Phaser.Physics.Arcade.Sprite
         this.lifeRegenUnlocked = false;
         this.lifeRegenPointsCollected = 0; // Track points for life regeneration
         this.lifeRegenPointsNeededForLife = 375; // Nerfed: Base points needed for a new life (375, 350, 325, 300, 275)
+        
+        // Zero Gravity ability properties
+        this.zeroGravityUnlocked = false;
+        this.zeroGravityActive = false;
+        this.zeroGravityAvailable = false;
+        this.zeroGravityStarPointsCollected = 0; // Track star points for Zero Gravity recharging
+        this.zeroGravityStarPointsNeeded = 250; // Base star points needed to recharge (250, 225, 200)
+        this.zeroGravityCooldown = 0;
+        this.zeroGravityCooldownMax = 0;
+        this.zeroGravityStarMagnetBonus = false;
+        this.zeroGravityEffectTimer = null;
+        this.zeroGravityParticles = [];
+        this.zeroGravityOverlay = null;
+        this.originalPlayerGravity = 0;
     }
 
     setCharacterScale(){
@@ -478,6 +493,7 @@ updateAbilityProperties() {
     this.empUnlocked = this.abilityRanks.emp >= 1;
     this.sonicBoomUnlocked = this.abilityRanks.sonicBoom >= 1;
     this.lifeRegenUnlocked = this.abilityRanks.lifeRegen >= 1;
+    this.zeroGravityUnlocked = this.abilityRanks.zeroGravity >= 1;
     this.platformJumpUnlocked = this.abilityRanks.platformDrop >= 1; // Jump through platforms from below
     this.platformDropUnlocked = this.abilityRanks.platformDrop >= 2; // Drop through platforms with down key
     this.platformDropAllUnlocked = this.abilityRanks.platformDrop >= 3; // Drop through ground and tall walls
@@ -503,6 +519,14 @@ updateAbilityProperties() {
     // Update life regen properties based on rank
     if (this.abilityRanks.lifeRegen >= 1) {
         this.lifeRegenPointsNeededForLife = Math.max(250, 375 - ((this.abilityRanks.lifeRegen - 1) * 25)); // Ensure minimum of 250 points needed
+    }
+    
+    // Update Zero Gravity properties based on rank
+    if (this.abilityRanks.zeroGravity >= 1) {
+        // Reduce star points needed every 3 levels: 250 -> 225 -> 200
+        const reductions = Math.floor((this.abilityRanks.zeroGravity - 1) / 3);
+        this.zeroGravityStarPointsNeeded = Math.max(200, 250 - (reductions * 25));
+        this.zeroGravityAvailable = true; // Start with first charge available
     }
 }
 
@@ -650,9 +674,26 @@ getBarrierChargePercentage() {
         return this.barrierUnlocked && this.barrierCharge >= 100 && !this.barrierActive;
     }
 
-// Get life regen charge progress for UI display
+    // Get Zero Gravity recharge progress for UI display
+    getZeroGravityRechargeProgress() {
+        if (!this.zeroGravityUnlocked) return { current: 0, needed: 250, percentage: 0 };
+        if (this.zeroGravityAvailable || this.zeroGravityActive) return { current: this.zeroGravityStarPointsNeeded, needed: this.zeroGravityStarPointsNeeded, percentage: 100 };
+        
+        return {
+            current: this.zeroGravityStarPointsCollected,
+            needed: this.zeroGravityStarPointsNeeded,
+            percentage: (this.zeroGravityStarPointsCollected / this.zeroGravityStarPointsNeeded) * 100
+        };
+    }
+    
+    // Check if Zero Gravity is ready to use
+    isZeroGravityReady() {
+        return this.zeroGravityUnlocked && this.zeroGravityAvailable && !this.zeroGravityActive;
+    }
+
+    // Get life regen charge progress for UI display
     getLifeRegenProgress() {
-        if (!this.lifeRegenUnlocked) return { current: 0, needed: 325, percentage: 0 };
+        if (!this.lifeRegenUnlocked) return { current: 0, needed: 375, percentage: 0 };
         
         // Ensure we have a valid needed value to prevent division by zero
         const needed = Math.max(250, this.lifeRegenPointsNeededForLife);
@@ -725,6 +766,34 @@ collectStar(starPoints = 9) {
             } else {
                 // Update charge percentage based on points collected
                 this.barrierCharge = (this.barrierPointsCollected / this.barrierPointsNeededForCharge) * this.barrierMaxCharge;
+            }
+        }
+        
+        // Charge Zero Gravity with star points
+        if (this.zeroGravityUnlocked && !this.zeroGravityAvailable && !this.zeroGravityActive) {
+            this.zeroGravityStarPointsCollected += starPoints;
+            if (this.zeroGravityStarPointsCollected >= this.zeroGravityStarPointsNeeded) {
+                this.zeroGravityAvailable = true;
+                this.zeroGravityStarPointsCollected = 0; // Reset counter
+                
+                // Show notification that Zero Gravity is ready
+                const readyText = this.gameScene.add.text(this.gameScene.cameras.main.centerX, 160, 'ZERO GRAVITY READY!', {
+                    fontFamily: 'Arial Black',
+                    fontSize: 28,
+                    color: '#88aaff',
+                    stroke: '#000000',
+                    strokeThickness: 4
+                }).setOrigin(0.5);
+                
+                this.gameScene.tweens.add({
+                    targets: readyText,
+                    alpha: 0,
+                    duration: 2000,
+                    ease: 'Power2',
+                    onComplete: () => {
+                        readyText.destroy();
+                    }
+                });
             }
         }
         
@@ -1219,35 +1288,316 @@ collectStar(starPoints = 9) {
         }
     }
 
-    // Apply magnetic effect to stars (Star Magnet ability)
+    // Zero Gravity ability activation
+    activateZeroGravity(bombs, stars) {
+        // Check if Zero Gravity is unlocked and available
+        if (!this.zeroGravityUnlocked || !this.zeroGravityAvailable || this.zeroGravityActive) {
+            return false;
+        }
+        
+        console.log('Zero Gravity activated by player - MOON GRAVITY!');
+        
+        // Set zero gravity state
+        this.zeroGravityActive = true;
+        this.zeroGravityAvailable = false;
+        
+        // Store original gravity values for restoration
+        this.originalPlayerGravity = this.body.gravity.y;
+        
+        // Get current rank for scaling effects
+        const rank = this.abilityRanks.zeroGravity || 1;
+        
+        // Moon-like gravity effect - almost floating bombs
+        if (bombs && bombs.children) {
+            bombs.children.entries.forEach(bomb => {
+                if (bomb.active) {
+                    // Much lighter anti-gravity - bombs almost float but don't rise
+                    bomb.body.setGravityY(-400 + (rank - 1) * -50); // Very light anti-gravity - almost floating
+                    // Slow down bombs significantly for moon-like movement
+                    bomb.setVelocity(bomb.body.velocity.x * 0.4, bomb.body.velocity.y * 0.4);
+                    bomb.setDrag(0); // No air resistance
+                    bomb.setBounce(1.0); // Full bounciness - bounces normally but slower falls
+                }
+            });
+        }
+        
+        if (stars && stars.children) {
+            stars.children.entries.forEach(star => {
+                if (star.active) {
+                    star.body.setGravityY(-100 - (rank - 1) * 30); // Gentle anti-gravity for stars
+                    // Make stars move slower
+                    star.setVelocity(star.body.velocity.x * 0.3, star.body.velocity.y * 0.3);
+                    star.setDrag(15); // Light air resistance
+                    star.setBounce(0.3); // Gentle bouncing
+                    
+                    // Gentle upward drift
+                    const upwardForce = Phaser.Math.Between(-15, -5);
+                    star.setVelocityY(star.body.velocity.y + upwardForce);
+                }
+            });
+        }
+        
+        // Apply no gravity change to player - player moves normally
+        // this.body.setGravityY(-600); // REMOVED - no gravity change for player
+        // this.body.setDrag(0); // REMOVED - no drag change for player
+        
+        // No initial velocity changes - player movement unaffected
+        // Player moves completely normally during zero gravity
+
+        // Enhanced star magnet effect during zero gravity
+        this.zeroGravityStarMagnetBonus = true;
+        
+        // Gentler continuous zero gravity effects
+        this.zeroGravityEffectTimer = this.gameScene.time.addEvent({
+            delay: 150, // Every 150ms for gentler effect
+            callback: () => {
+                // Apply gentle anti-gravity to all objects
+                if (bombs && bombs.children) {
+                    bombs.children.entries.forEach(bomb => {
+                        if (bomb.active) {
+                            // No drift forces needed - let natural moon gravity work
+                            // Bombs will bounce normally but fall much slower
+                            
+                            // Normal velocity limits - unrestricted bouncing
+                            const maxVel = 600;
+                            if (Math.abs(bomb.body.velocity.x) > maxVel) {
+                                bomb.setVelocityX(bomb.body.velocity.x > 0 ? maxVel : -maxVel);
+                            }
+                            if (bomb.body.velocity.y > maxVel) {
+                                bomb.setVelocityY(maxVel);
+                            }
+                        }
+                    });
+                }
+                
+                if (stars && stars.children) {
+                    stars.children.entries.forEach(star => {
+                        if (star.active) {
+                            // Gentle upward drift
+                            const driftY = Phaser.Math.Between(-6, -2);
+                            star.setVelocityY(star.body.velocity.y + driftY);
+                            
+                            // Normal movement limits
+                            const maxVel = 80;
+                            if (Math.abs(star.body.velocity.x) > maxVel) {
+                                star.setVelocityX(star.body.velocity.x > 0 ? maxVel : -maxVel);
+                            }
+                            if (star.body.velocity.y > maxVel) {
+                                star.setVelocityY(maxVel);
+                            }
+                            
+                            // Add gentle upward force
+                            star.setVelocityY(star.body.velocity.y - 1);
+                        }
+                    });
+                }
+                
+                // Keep player floating extremely gently
+                if (this.body.velocity.y > 250) {
+                    this.setVelocityY(250); // Higher falling speed cap for player
+                }
+                
+                // Very minimal upward force to player
+                this.setVelocityY(this.body.velocity.y - 0.1);
+            },
+            loop: true
+        });
+        
+        // Enhanced star magnet effect - not ultra massive
+        if (stars && stars.children) {
+            stars.children.entries.forEach(star => {
+                if (star.active) {
+                    const distance = Phaser.Math.Distance.Between(this.x, this.y, star.x, star.y);
+                    const maxDistance = 400; // Reasonable range
+                    
+                    if (distance < maxDistance) {
+                        const force = Math.max(1.0, (maxDistance - distance) / maxDistance) * 15; // Moderate force
+                        const angle = Phaser.Math.Angle.Between(star.x, star.y, this.x, this.y);
+                        
+                        const forceX = Math.cos(angle) * force;
+                        const forceY = Math.sin(angle) * force;
+                        
+                        star.setVelocity(star.body.velocity.x + forceX, star.body.velocity.y + forceY);
+                    }
+                }
+            });
+        }
+        
+        // Visual effects - simplified approach without post pipelines
+        this.zeroGravityOverlay = this.gameScene.add.rectangle(
+            this.gameScene.cameras.main.centerX,
+            this.gameScene.cameras.main.centerY,
+            this.gameScene.cameras.main.width,
+            this.gameScene.cameras.main.height,
+            0x6666ff,
+            0.1
+        );
+        this.zeroGravityOverlay.setScrollFactor(0);
+        this.zeroGravityOverlay.setDepth(999);
+        
+        // Pulsing effect for the overlay
+        this.gameScene.tweens.add({
+            targets: this.zeroGravityOverlay,
+            alpha: 0.2,
+            duration: 1000,
+            yoyo: true,
+            repeat: -1,
+            ease: 'Sine.easeInOut'
+        });
+        
+        // Create floating particle effect
+        this.createZeroGravityParticles();
+        
+        // Shorter duration - moon gravity periods
+        const duration = 12000 + (rank - 1) * 3000; // 12s base + 3s per rank (up to 18s at max rank)
+        
+        // Schedule deactivation
+        this.gameScene.time.delayedCall(duration, () => {
+            this.deactivateZeroGravity(bombs, stars);
+        });
+        
+        return true;
+    }
+    
+    createZeroGravityParticles() {
+        // Create floating particle effect to show zero gravity is active
+        if (!this.zeroGravityParticles) {
+            this.zeroGravityParticles = [];
+        }
+        
+        // Create 15 floating particles
+        for (let i = 0; i < 15; i++) {
+            const particle = this.gameScene.add.circle(
+                Phaser.Math.Between(0, 1450),
+                Phaser.Math.Between(200, 950),
+                Phaser.Math.Between(2, 5),
+                0x88aaff,
+                0.5
+            );
+            
+            this.gameScene.physics.add.existing(particle);
+            particle.body.setGravityY(-300);
+            particle.body.setVelocity(
+                Phaser.Math.Between(-15, 15),
+                Phaser.Math.Between(-25, -10)
+            );
+            
+            this.zeroGravityParticles.push(particle);
+        }
+    }
+
+    deactivateZeroGravity(bombs, stars) {
+        console.log('Zero Gravity deactivated - returning to normal gravity');
+        
+        this.zeroGravityActive = false;
+        this.zeroGravityStarMagnetBonus = false;
+        
+        // Stop the continuous effect timer
+        if (this.zeroGravityEffectTimer) {
+            this.zeroGravityEffectTimer.remove();
+            this.zeroGravityEffectTimer = null;
+        }
+        
+        // Remove floating particles
+        if (this.zeroGravityParticles) {
+            this.zeroGravityParticles.forEach(particle => {
+                if (particle && particle.destroy) {
+                    particle.destroy();
+                }
+            });
+            this.zeroGravityParticles = [];
+        }
+        
+        // Remove visual overlay effect
+        if (this.zeroGravityOverlay) {
+            this.gameScene.tweens.killTweensOf(this.zeroGravityOverlay);
+            this.zeroGravityOverlay.destroy();
+            this.zeroGravityOverlay = null;
+        }
+        
+        // Restore normal gravity and physics for all objects
+        if (bombs && bombs.children) {
+            bombs.children.entries.forEach(bomb => {
+                if (bomb.active) {
+                    bomb.body.setGravityY(0); // Reset to normal
+                    bomb.setDrag(0); // Remove air resistance
+                    bomb.setBounce(1); // Restore full bounciness
+                    
+                    // Gently restore normal velocities with more force
+                    const currentVelX = bomb.body.velocity.x;
+                    const currentVelY = bomb.body.velocity.y;
+                    
+                    // Apply stronger normal bomb speed if moving too slowly
+                    if (Math.abs(currentVelX) < 100) {
+                        bomb.setVelocityX(currentVelX > 0 ? 200 : -200);
+                    }
+                    if (Math.abs(currentVelY) < 100) {
+                        bomb.setVelocityY(currentVelY > 0 ? 150 : -150);
+                    }
+                }
+            });
+        }
+        
+        if (stars && stars.children) {
+            stars.children.entries.forEach(star => {
+                if (star.active) {
+                    star.body.setGravityY(0); // Reset to normal
+                    star.setDrag(0); // Remove air resistance
+                    star.setBounce(0.7); // Restore normal bounce
+                }
+            });
+        }
+        
+        // Restore normal gravity for player
+        this.body.setGravityY(this.originalPlayerGravity || 0);
+        this.body.setDrag(0); // Remove air resistance
+        
+        // Remove visual effect - reset camera effects
+        this.gameScene.cameras.main.resetPostPipeline();
+        
+        // Zero Gravity now recharges with star points instead of time
+        this.zeroGravityAvailable = false;
+        this.zeroGravityStarPointsCollected = 0; // Reset star point collection
+        
+        console.log(`Zero Gravity needs ${this.zeroGravityStarPointsNeeded} star points to recharge`);
+    }
+    
+    // Enhanced star magnet during zero gravity
     applyStarMagnet(stars) {
-        if (this.abilityRanks.starMagnet < 1) return;
+        if (this.abilityRanks.starMagnet < 1 || !stars || !stars.children) {
+            return;
+        }
         
-        // Progressive tier system - current level 2 becomes level 4
-        const magnetRanges = [0, 100, 125, 175, 250]; // Tier 1-4 ranges (tier 4 was old tier 2)
-        const magnetForces = [0, 200, 250, 325, 400]; // Tier 1-4 forces (tier 4 was old tier 2)
+        // Base magnet properties
+        const magnetRanges = [0, 80, 100, 130, 170, 220];
+        const magnetForces = [0, 150, 180, 220, 280, 350];
         
-        const magnetRange = magnetRanges[this.abilityRanks.starMagnet] || 100;
-        const magnetForce = magnetForces[this.abilityRanks.starMagnet] || 200;
+        const baseMagnetRange = magnetRanges[this.abilityRanks.starMagnet] || 80;
+        const baseMagnetForce = magnetForces[this.abilityRanks.starMagnet] || 150;
+        
+        // Enhanced effects during zero gravity - 2x stronger
+        const magnetForce = this.zeroGravityStarMagnetBonus ? baseMagnetForce * 2 : baseMagnetForce;
+        const magnetRange = this.zeroGravityStarMagnetBonus ? baseMagnetRange * 2 : baseMagnetRange;
         
         stars.children.entries.forEach(star => {
             if (star.active) {
                 const distance = Phaser.Math.Distance.Between(this.x, this.y, star.x, star.y);
                 
                 if (distance < magnetRange && distance > 20) {
-                    // Calculate direction from star to player
+                    const force = Math.max(0.1, (magnetRange - distance) / magnetRange) * magnetForce;
                     const angle = Phaser.Math.Angle.Between(star.x, star.y, this.x, this.y);
                     
-                    // Apply magnetic force (stronger when closer)
-                    const force = magnetForce * (1 - distance / magnetRange);
-                    const velocityX = Math.cos(angle) * force;
-                    const velocityY = Math.sin(angle) * force;
+                    const forceX = Math.cos(angle) * force;
+                    const forceY = Math.sin(angle) * force;
                     
-                    star.setVelocity(velocityX, velocityY);
+                    star.setVelocity(
+                        star.body.velocity.x + forceX,
+                        star.body.velocity.y + forceY
+                    );
                     
-                    // Visual effect
-                    if (!star.magnetTint) {
-                        star.setTint(0xffff00);
+                    // Visual effect during zero gravity
+                    if (this.zeroGravityStarMagnetBonus && !star.magnetTint) {
+                        star.setTint(0x88aaff);
                         star.magnetTint = true;
                         
                         this.gameScene.time.delayedCall(300, () => {
@@ -1261,5 +1611,4 @@ collectStar(starPoints = 9) {
             }
         });
     }
-
 }

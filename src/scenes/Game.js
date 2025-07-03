@@ -55,6 +55,9 @@ export class Game extends Phaser.Scene {
         // Add Q key for Sonic Boom activation
         this.cursors.sonicBoom = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Q);
 
+        // Add R key for Zero Gravity activation
+        this.cursors.zeroGravity = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.R);
+
         // Create stars with random positions and movement
         this.createMovingStars();
 
@@ -90,6 +93,9 @@ export class Game extends Phaser.Scene {
         this.barrierKeyPressed = false;
         this.empKeyPressed = false;
         this.sonicBoomKeyPressed = false;
+        
+        // Track zero gravity key state to prevent continuous activation
+        this.zeroGravityKeyPressed = false;
 
         this.bombs = this.physics.add.group();
 
@@ -117,6 +123,9 @@ export class Game extends Phaser.Scene {
         
         // Create Life Regen UI elements (initially hidden)
         this.createLifeRegenUI();
+        
+        // Create Zero Gravity UI elements (initially hidden)
+        this.createZeroGravityUI();
 
         // Release the first bomb immediately when the game starts
         this.releasedBomb();
@@ -228,6 +237,26 @@ export class Game extends Phaser.Scene {
             this.sonicBoomKeyPressed = false;
         }
         
+        // Handle Zero Gravity activation with R key or virtual zero gravity button (only when unlocked and available)
+        const zeroGravityPressed = this.cursors.zeroGravity?.isDown || this.virtualControls.zeroGravity;
+        if (zeroGravityPressed && !this.zeroGravityKeyPressed) {
+            // Check if the method exists before calling it
+            if (this.player.activateZeroGravity && typeof this.player.activateZeroGravity === 'function') {
+                if (this.player.activateZeroGravity(this.bombs, this.stars)) {
+                    this.zeroGravityKeyPressed = true;
+                }
+            } else {
+                // Temporary fallback implementation until Player class is updated
+                if (this.player.zeroGravityUnlocked && this.player.zeroGravityAvailable) {
+                    console.log('Activating Zero Gravity (temporary implementation)');
+                    this.activateZeroGravityTemporary();
+                    this.zeroGravityKeyPressed = true;
+                }
+            }
+        } else if (!zeroGravityPressed) {
+            this.zeroGravityKeyPressed = false;
+        }
+        
         // Throttle UI updates to prevent performance issues
         // Only update UI every 10 frames (6 times per second instead of 60)
         if (!this.uiUpdateCounter) {
@@ -248,6 +277,9 @@ export class Game extends Phaser.Scene {
             // Update Life Regen UI
             this.updateLifeRegenUI();
             
+            // Update Zero Gravity UI
+            this.updateZeroGravityUI();
+            
             this.uiUpdateCounter = 0;
         }
         
@@ -267,12 +299,27 @@ export class Game extends Phaser.Scene {
         const scoreEarned = this.player.getStarScoreValue();
         this.score += scoreEarned;
         this.scoreText.setText('score: ' + this.score);
-        
 
-        
         // Track star collection for EMP charging (pass the actual points earned)
         this.player.collectStar(scoreEarned);
-        
+
+        // --- Ensure Zero Gravity charging works ---
+        // If your Player.collectStar is correct, this is not needed.
+        // But if you want to guarantee charging here, you can add:
+        if (
+            this.player.zeroGravityUnlocked &&
+            !this.player.zeroGravityAvailable &&
+            !this.player.zeroGravityActive
+        ) {
+            this.player.zeroGravityStarPointsCollected += scoreEarned;
+            if (this.player.zeroGravityStarPointsCollected >= this.player.zeroGravityStarPointsNeeded) {
+                this.player.zeroGravityAvailable = true;
+                this.player.zeroGravityStarPointsCollected = 0;
+                // Optional: show notification here if you want
+            }
+        }
+        // --- End Zero Gravity charging block ---
+
         // Track star collection for Sonic Boom charging
         this.player.chargeSonicBoom(scoreEarned);
 
@@ -884,7 +931,8 @@ hitBomb (player, bomb){
             { name: 'emp', title: 'EMP', icon: '⚡', x: 1000, y: 350 },
             { name: 'sonicBoom', title: this.player.getSonicBoomUpgradeName(), icon: '💥', x: 1150, y: 350 },
             { name: 'platformDrop', title: this.player.getPlatformDropUpgradeName(), icon: '↕', x: 850, y: 500 },
-            { name: 'tokenBonus', title: this.player.getTokenBonusUpgradeName(), icon: '�', x: 1000, y: 500 }
+            { name: 'tokenBonus', title: this.player.getTokenBonusUpgradeName(), icon: '💰', x: 1000, y: 500 },
+            { name: 'zeroGravity', title: this.getZeroGravityUpgradeName(), icon: '🌌', x: 1150, y: 500 }
         ];
         
         console.log('Premium upgrades defined:', premiumUpgrades);
@@ -907,10 +955,37 @@ hitBomb (player, bomb){
     }
     
     createUpgradeCard(upgrade, isPremium) {
-        const currentRank = this.player.abilityRanks[upgrade.name];
-        const maxRank = this.player.getMaxRank(upgrade.name);
-        const canUpgrade = this.player.canUpgrade(upgrade.name);
-        const cost = this.player.getUpgradeCost(upgrade.name, currentRank);
+        const currentRank = this.player.abilityRanks[upgrade.name] || 0; // Add fallback for undefined ranks
+        
+        // Handle Zero Gravity upgrade with new cost logic
+        let maxRank, canUpgrade, cost;
+        
+        if (upgrade.name === 'zeroGravity') {
+            // Initialize zeroGravity rank if it doesn't exist
+            if (!this.player.abilityRanks.zeroGravity) {
+                this.player.abilityRanks.zeroGravity = 0;
+            }
+            
+            maxRank = 3;
+            // New cost logic for Zero Gravity
+            if (currentRank === 0) {
+                cost = { tokens: 0, specialTokens: 1 };
+            } else if (currentRank === 1) {
+                cost = { tokens: 6, specialTokens: 0 };
+            } else if (currentRank === 2) {
+                cost = { tokens: 12, specialTokens: 0 };
+            } else {
+                cost = { tokens: 0, specialTokens: 0 };
+            }
+            canUpgrade =
+                currentRank < maxRank &&
+                this.player.tokens >= cost.tokens &&
+                this.player.specialTokens >= (cost.specialTokens || 0);
+        } else {
+            maxRank = this.player.getMaxRank(upgrade.name);
+            canUpgrade = this.player.canUpgrade(upgrade.name);
+            cost = this.player.getUpgradeCost(upgrade.name, currentRank);
+        }
         
         // Card background
         const cardWidth = 120;
@@ -1016,22 +1091,321 @@ hitBomb (player, bomb){
         // Button interactions
         if (canUpgrade) {
             card.on('pointerdown', () => {
-                this.purchaseUpgrade(upgrade.name);
+                // Handle Zero Gravity upgrade purchase with fallback
+                if (upgrade.name === 'zeroGravity') {
+                    this.purchaseZeroGravityUpgrade();
+                } else {
+                    this.purchaseUpgrade(upgrade.name);
+                }
             });
         }
     }
+
+    // Temporary Zero Gravity upgrade purchase handler
+    purchaseZeroGravityUpgrade() {
+        // Initialize zeroGravity rank if it doesn't exist
+        if (!this.player.abilityRanks.zeroGravity) {
+            this.player.abilityRanks.zeroGravity = 0;
+        }
+        
+        const currentRank = this.player.abilityRanks.zeroGravity;
+        // New cost logic for Zero Gravity
+        let cost;
+        if (currentRank === 0) {
+            cost = { tokens: 0, specialTokens: 1 };
+        } else if (currentRank === 1) {
+            cost = { tokens: 6, specialTokens: 0 };
+        } else if (currentRank === 2) {
+            cost = { tokens: 12, specialTokens: 0 };
+        } else {
+            cost = { tokens: 0, specialTokens: 0 };
+        }
+        
+        console.log('Attempting Zero Gravity purchase:', {
+            currentRank,
+            playerTokens: this.player.tokens,
+            playerSpecialTokens: this.player.specialTokens,
+            cost,
+            canAfford: this.player.tokens >= cost.tokens && this.player.specialTokens >= (cost.specialTokens || 0)
+        });
+        
+        // Check if player can afford it
+        if (
+            this.player.tokens >= cost.tokens &&
+            this.player.specialTokens >= (cost.specialTokens || 0)
+        ) {
+            // Deduct cost
+            this.player.tokens -= cost.tokens;
+            if (cost.specialTokens) {
+                this.player.specialTokens -= cost.specialTokens;
+            }
+            
+            // Upgrade the rank
+            this.player.abilityRanks.zeroGravity++;
+            
+            console.log('Zero Gravity upgrade successful! New rank:', this.player.abilityRanks.zeroGravity);
+            
+            // Unlock mobile button on first purchase
+            if (this.player.abilityRanks.zeroGravity === 1) {
+                console.log('Zero Gravity upgrade purchased, unlocking mobile button');
+                this.unlockMobileAbility('zero gravity');
+                
+                // Set up basic Zero Gravity properties on player
+                this.player.zeroGravityUnlocked = true;
+                this.player.zeroGravityAvailable = true;
+                this.player.zeroGravityActive = false;
+                this.player.zeroGravityCooldown = 0;
+            }
+            
+            // Refresh upgrade menu
+            this.refreshUpgradeMenu();
+            
+            // Show upgrade effect
+            this.showUpgradeEffect('zeroGravity');
+        } else {
+            console.log('Cannot afford Zero Gravity upgrade');
+        }
+    }
+
+    // Add missing method for Zero Gravity upgrade name
+    getZeroGravityUpgradeName() {
+        if (!this.player || !this.player.abilityRanks) return 'Zero Gravity';
+        
+        const rank = this.player.abilityRanks.zeroGravity || 0;
+        if (rank === 0) return 'Zero Gravity';
+        if (rank === 1) return 'Zero Gravity I';
+        if (rank === 2) return 'Zero Gravity II';
+        if (rank === 3) return 'Zero Gravity III';
+        return 'Zero Gravity MAX';
+    }
+
+    // Create Zero Gravity UI
+    createZeroGravityUI() {
+        // Zero Gravity UI - positioned next to barrier UI
+        this.zeroGravityLabel = this.add.text(220, 870, 'Zero Gravity:', { fontSize: '20px', fill: '#8a2be2'});
+        
+        // Zero Gravity charge bar background
+        this.zeroGravityBarBg = this.add.rectangle(220, 900, 200, 20, 0x333333);
+        this.zeroGravityBarBg.setOrigin(0, 0.5);
+        this.zeroGravityBarBg.setStrokeStyle(2, 0x8a2be2);
+        
+        // Zero Gravity charge bar fill
+        this.zeroGravityBarFill = this.add.rectangle(222, 900, 196, 16, 0x8a2be2);
+        this.zeroGravityBarFill.setOrigin(0, 0.5);
+        
+        // Zero Gravity instruction text
+        this.zeroGravityInstruction = this.add.text(220, 920, 'Press R to activate', { fontSize: '14px', fill: '#ffffff'});
+        
+        // Initially hide zero gravity UI
+        this.setZeroGravityUIVisible(false);
+    }
     
+    updateZeroGravityUI() {
+        if (!this.player.zeroGravityUnlocked) {
+            this.setZeroGravityUIVisible(false);
+            return;
+        }
+
+        this.setZeroGravityUIVisible(true);
+
+        // --- Use star-based recharge progress for UI ---
+        let progress = this.player.getZeroGravityRechargeProgress
+            ? this.player.getZeroGravityRechargeProgress()
+            : { current: 0, needed: 1, percentage: 0 };
+
+        this.zeroGravityBarFill.scaleX = Math.max(0.01, progress.percentage / 100);
+
+        if (this.player.zeroGravityAvailable) {
+            this.zeroGravityBarFill.setFillStyle(0x00ff00); // Green when ready
+            this.zeroGravityLabel.setColor('#00ff00');
+            this.zeroGravityInstruction.setText('Press R to activate');
+        } else if (this.player.zeroGravityActive) {
+            this.zeroGravityBarFill.setFillStyle(0xffff00); // Yellow when active
+            this.zeroGravityLabel.setColor('#ffff00');
+            this.zeroGravityInstruction.setText('ZERO GRAVITY ACTIVE!');
+        } else {
+            this.zeroGravityBarFill.setFillStyle(0xff4444); // Red when charging
+            this.zeroGravityLabel.setColor('#ff4444');
+            this.zeroGravityInstruction.setText(
+                `Collect ${progress.needed - progress.current} more star points`
+            );
+        }
+    }
+    
+    setZeroGravityUIVisible(visible) {
+        this.zeroGravityLabel.setVisible(visible);
+        this.zeroGravityBarBg.setVisible(visible);
+        this.zeroGravityBarFill.setVisible(visible);
+        this.zeroGravityInstruction.setVisible(visible);
+    }
+
+    // Life Regen UI functions
+    createLifeRegenUI() {
+        // Only create if Life Regen is unlocked
+        if (this.player.abilityRanks.lifeRegen === 0) {
+            return;
+        }
+
+        // Create Life Regen meter next to lives counter
+        const lifeRegenX = 480;
+        const lifeRegenY = 16;
+        
+        // Background for the meter
+        this.lifeRegenBg = this.add.rectangle(lifeRegenX, lifeRegenY + 5, 160, 16, 0x444444);
+        this.lifeRegenBg.setOrigin(0, 0);
+        this.lifeRegenBg.setScrollFactor(0);
+        this.lifeRegenBg.setDepth(1000);
+        this.lifeRegenBg.setStrokeStyle(2, 0xffffff);
+        
+        // Progress bar for the meter
+        this.lifeRegenBar = this.add.rectangle(lifeRegenX + 2, lifeRegenY + 7, 1, 12, 0x00ff88);
+        this.lifeRegenBar.setOrigin(0, 0);
+        this.lifeRegenBar.setScrollFactor(0);
+        this.lifeRegenBar.setDepth(1001);
+        
+        // Label for the meter
+        this.lifeRegenLabel = this.add.text(lifeRegenX - 100, lifeRegenY + 11, 'LIFE REGEN', {
+            fontFamily: 'Arial',
+            fontSize: '10px',
+            color: '#ffffff'
+        });
+        this.lifeRegenLabel.setScrollFactor(0);
+        this.lifeRegenLabel.setDepth(1002);
+    }
+
+    updateLifeRegenUI() {
+        // Only update if Life Regen is unlocked
+        if (this.player.abilityRanks.lifeRegen === 0) {
+            if (this.lifeRegenBg) {
+                this.lifeRegenBg.setVisible(false);
+                this.lifeRegenBar.setVisible(false);
+                this.lifeRegenLabel.setVisible(false);
+            }
+            return;
+        }
+
+        // Show UI elements if they exist
+        if (this.lifeRegenBg) {
+            this.lifeRegenBg.setVisible(true);
+            this.lifeRegenBar.setVisible(true);
+            this.lifeRegenLabel.setVisible(true);
+        } else {
+            this.createLifeRegenUI();
+        }
+
+        // Update progress bar
+        if (this.lifeRegenBar) {
+            const progress = this.player.getLifeRegenProgress();
+            
+            if (!this.lastLifeRegenProgress || 
+                this.lastLifeRegenProgress.current !== progress.current || 
+                this.lastLifeRegenProgress.needed !== progress.needed) {
+                
+                const maxWidth = 156;
+                const currentWidth = Math.max(1, Math.min(maxWidth, maxWidth * (progress.current / progress.needed)));
+                
+                this.lifeRegenBar.setSize(currentWidth, 12);
+                
+                if (progress.current >= progress.needed) {
+                    this.lifeRegenBar.setFillStyle(0xffff00);
+                    this.lifeRegenLabel.setText('READY!');
+                    this.lifeRegenLabel.setColor('#ffff00');
+                } else {
+                    this.lifeRegenBar.setFillStyle(0x00ff88);
+                    this.lifeRegenLabel.setText(`LIFE REGEN (${progress.current}/${progress.needed})`);
+                    this.lifeRegenLabel.setColor('#ffffff');
+                }
+                
+                this.lastLifeRegenProgress = {
+                    current: progress.current,
+                    needed: progress.needed
+                };
+            }
+        }
+    }
+
+    // Clear old version data
+    clearOldVersionData() {
+        const CURRENT_VERSION = '3.0';
+        const storedVersion = localStorage.getItem('gameVersion');
+        
+        if (!storedVersion || storedVersion !== CURRENT_VERSION) {
+            console.log('New version detected! Clearing old data for fresh start...');
+            
+            localStorage.removeItem('highScore');
+            localStorage.removeItem('highestLevel');
+            localStorage.removeItem('playerData');
+            localStorage.removeItem('abilities');
+            localStorage.removeItem('tokens');
+            localStorage.removeItem('specialTokens');
+            localStorage.removeItem('upgrades');
+            localStorage.removeItem('stars');
+            localStorage.removeItem('lives');
+            localStorage.removeItem('level');
+            localStorage.removeItem('score');
+            
+            localStorage.setItem('gameVersion', CURRENT_VERSION);
+            
+            console.log('Old data cleared! Starting fresh with version', CURRENT_VERSION);
+            
+            this.showVersionUpdateNotification();
+        }
+    }
+    
+    showVersionUpdateNotification() {
+        let notificationBg = this.add.rectangle(725, 200, 600, 120, 0x000000, 0.95);
+        notificationBg.setStrokeStyle(3, 0x00ff00);
+        notificationBg.setDepth(2000);
+        
+        let title = this.add.text(725, 170, 'GAME UPDATED!', {
+            fontFamily: 'Arial Black',
+            fontSize: 28,
+            color: '#00ff00',
+            stroke: '#000000',
+            strokeThickness: 3
+        }).setOrigin(0.5);
+        title.setDepth(2001);
+        
+        let message = this.add.text(725, 200, 'Welcome to BombDrop v3.0!\nYour progress has been reset for the new version.', {
+            fontFamily: 'Arial',
+            fontSize: 16,
+            color: '#ffffff',
+            align: 'center'
+        }).setOrigin(0.5);
+        message.setDepth(2001);
+        
+        let subtext = this.add.text(725, 235, 'New features: Life Regen, balanced abilities, improved gameplay!', {
+            fontFamily: 'Arial',
+            fontSize: 12,
+            color: '#ffff00'
+        }).setOrigin(0.5);
+        subtext.setDepth(2001);
+        
+        this.time.delayedCall(5000, () => {
+            this.tweens.add({
+                targets: [notificationBg, title, message, subtext],
+                alpha: 0,
+                duration: 1000,
+                ease: 'Power2',
+                onComplete: () => {
+                    notificationBg.destroy();
+                    title.destroy();
+                    message.destroy();
+                    subtext.destroy();
+                }
+            });
+        });
+    }
+
+    // Add missing methods that are referenced but not defined
     purchaseUpgrade(abilityName) {
-        // Check if this is the first purchase of Life Regen
         const wasLifeRegenLocked = (abilityName === 'lifeRegen' && this.player.abilityRanks.lifeRegen === 0);
         
         if (this.player.upgradeAbility(abilityName)) {
-            // Grant an extra life when first purchasing Life Regen
             if (wasLifeRegenLocked) {
                 this.lives++;
                 this.livesText.setText('Lives: ' + this.lives);
                 
-                // Show special notification for Life Regen unlock + bonus life
                 const bonusLifeText = this.add.text(this.cameras.main.centerX, 150, 'LIFE REGEN UNLOCKED!\n+1 BONUS LIFE!', {
                     fontFamily: 'Arial Black',
                     fontSize: 24,
@@ -1054,39 +1428,26 @@ hitBomb (player, bomb){
             
             // Unlock mobile buttons when abilities are first purchased
             if (abilityName === 'fastFall' && this.player.abilityRanks.fastFall === 1) {
-                console.log('Fast Fall upgrade purchased, unlocking mobile button');
                 this.unlockMobileAbility('fast fall');
             }
-            
             if (abilityName === 'barrier' && this.player.abilityRanks.barrier === 1) {
-                console.log('Barrier upgrade purchased, unlocking mobile button');
                 this.unlockMobileAbility('barrier');
             }
-            
             if (abilityName === 'emp' && this.player.abilityRanks.emp === 1) {
-                console.log('EMP upgrade purchased, unlocking mobile button');
                 this.unlockMobileAbility('emp');
             }
-            
             if (abilityName === 'sonicBoom' && this.player.abilityRanks.sonicBoom === 1) {
-                console.log('Sonic Boom upgrade purchased, unlocking mobile button');
                 this.unlockMobileAbility('sonic');
             }
             
-            // Update token display
             this.updateTokenUI();
-            
-            // Refresh the upgrade menu to show new state
             this.refreshUpgradeMenu();
-            
-            // Show upgrade effect
             this.showUpgradeEffect(abilityName);
         }
     }
-    
+
     refreshUpgradeMenu() {
-        // Remove only the upgrade cards, keep the background and headers
-        const elementsToKeep = 6; // background, title, tokens earned, current tokens, 2 headers
+        const elementsToKeep = 6;
         while (this.upgradeMenuElements.length > elementsToKeep) {
             const element = this.upgradeMenuElements.pop();
             if (element && element.destroy) {
@@ -1094,20 +1455,15 @@ hitBomb (player, bomb){
             }
         }
         
-        // Recreate the cards
         this.createUpgradeCards();
-        
-        // Recreate continue button and ESC instruction
         this.createContinueButton();
         
-        // Update current tokens display
         if (this.upgradeMenuElements[3]) {
             this.upgradeMenuElements[3].setText(`Tokens: ${this.player.tokens}  Special: ${this.player.specialTokens}`);
         }
     }
-    
+
     createContinueButton() {
-        // Add Continue button - centered at bottom
         let continueButton = this.add.rectangle(725, 780, 250, 60, 0x00aa00, 1);
         continueButton.setStrokeStyle(3, 0x00ff00);
         continueButton.setInteractive();
@@ -1118,7 +1474,6 @@ hitBomb (player, bomb){
             color: '#ffffff'
         }).setOrigin(0.5);
         
-        // Add ESC to continue instruction
         let continueText = this.add.text(725, 850, 'Press ESC to continue without upgrading', {
             fontFamily: 'Arial',
             fontSize: 20,
@@ -1127,7 +1482,6 @@ hitBomb (player, bomb){
         
         this.upgradeMenuElements.push(continueButton, continueButtonText, continueText);
         
-        // Continue button interactions
         continueButton.on('pointerover', () => {
             continueButton.setFillStyle(0x00cc00);
         });
@@ -1140,75 +1494,9 @@ hitBomb (player, bomb){
             this.closeUpgradeMenu();
         });
     }
-    
+
     showUpgradeEffect(abilityName) {
-        let upgradeDisplayName;
-        
-        if (abilityName === 'jump') {
-            // Get the actual jump upgrade name based on the new rank
-            const jumpRank = this.player.abilityRanks.jump;
-            if (jumpRank === 1) upgradeDisplayName = 'Double Jump';
-            else if (jumpRank === 2) upgradeDisplayName = 'Triple Jump';
-            else if (jumpRank === 3) upgradeDisplayName = 'Quad Jump';
-            else if (jumpRank === 4) upgradeDisplayName = 'Penta Jump';
-            else if (jumpRank === 5) upgradeDisplayName = 'Hexa Jump';
-            else upgradeDisplayName = 'Jump';
-        } else if (abilityName === 'speed') {
-            // Get the actual speed upgrade name based on the new rank
-            const speedRank = this.player.abilityRanks.speed;
-            if (speedRank === 1) upgradeDisplayName = 'Super Speed I';
-            else if (speedRank === 2) upgradeDisplayName = 'Super Speed II';
-            else if (speedRank === 3) upgradeDisplayName = 'Super Speed III';
-            else if (speedRank === 4) upgradeDisplayName = 'Super Speed IV';
-            else if (speedRank === 5) upgradeDisplayName = 'Super Speed V';
-            else upgradeDisplayName = 'Super Speed';
-        } else if (abilityName === 'slowBombs') {
-            // Get the actual slow bombs upgrade name based on the new rank
-            const slowBombsRank = this.player.abilityRanks.slowBombs;
-            const tierNames = ['Slow Bombs I', 'Slow Bombs II', 'Slow Bombs III', 'Slow Bombs IV', 'Slow Bombs V'];
-            upgradeDisplayName = tierNames[slowBombsRank - 1] || 'Slow Bombs';
-        } else if (abilityName === 'starMagnet') {
-            // Get the actual star magnet upgrade name based on the new rank
-            const starMagnetRank = this.player.abilityRanks.starMagnet;
-            const tierNames = ['Star Magnet I', 'Star Magnet II', 'Star Magnet III', 'Star Magnet IV', 'Star Magnet V'];
-            upgradeDisplayName = tierNames[starMagnetRank - 1] || 'Star Magnet';
-        } else if (abilityName === 'starMultiplier') {
-            // Get the actual star multiplier upgrade name based on the new rank
-            const starMultiplierRank = this.player.abilityRanks.starMultiplier;
-            if (starMultiplierRank === 1) upgradeDisplayName = 'Star Multiplier x1.1';
-            else if (starMultiplierRank === 2) upgradeDisplayName = 'Star Multiplier x1.3';
-            else if (starMultiplierRank === 3) upgradeDisplayName = 'Star Multiplier x1.5';
-            else upgradeDisplayName = 'Star Multiplier';
-        } else if (abilityName === 'platformDrop') {
-            // Get the actual platform drop upgrade name based on the new rank
-            const platformDropRank = this.player.abilityRanks.platformDrop;
-            if (platformDropRank === 1) upgradeDisplayName = 'Platform Jump';
-            else if (platformDropRank === 2) upgradeDisplayName = 'Platform Drop';
-            else if (platformDropRank === 3) upgradeDisplayName = 'Platform Drop All';
-            else upgradeDisplayName = 'Platform Drop';
-        } else if (abilityName === 'tokenBonus') {
-            // Get the actual token bonus upgrade name based on the new rank
-            const tokenBonusRank = this.player.abilityRanks.tokenBonus;
-            if (tokenBonusRank === 1) upgradeDisplayName = 'Token Bonus +2';
-            else if (tokenBonusRank === 2) upgradeDisplayName = 'Token Bonus +3';
-            else if (tokenBonusRank === 3) upgradeDisplayName = 'Token Bonus +4';
-            else upgradeDisplayName = 'Token Bonus';
-        } else if (abilityName === 'sonicBoom') {
-            // Get the actual sonic boom upgrade name based on the new rank
-            const sonicBoomRank = this.player.abilityRanks.sonicBoom;
-            if (sonicBoomRank === 1) upgradeDisplayName = 'Sonic Boom I';
-            else if (sonicBoomRank === 2) upgradeDisplayName = 'Sonic Boom II';
-            else if (sonicBoomRank === 3) upgradeDisplayName = 'Sonic Boom III';
-            else upgradeDisplayName = 'Sonic Boom';
-        } else {
-            const abilityNames = {
-                'fastFall': `Fast Fall ${this.player.abilityRanks.fastFall > 0 ? 'Tier ' + this.player.abilityRanks.fastFall : ''}`,
-                'barrier': 'Barrier',
-                'emp': 'EMP',
-                'extraLife': 'Extra Life'
-            };
-            upgradeDisplayName = abilityNames[abilityName];
-        }
+        let upgradeDisplayName = abilityName;
         
         let effectText = this.add.text(600, 600, `${upgradeDisplayName} UPGRADED!`, {
             fontFamily: 'Arial Black',
@@ -1220,7 +1508,6 @@ hitBomb (player, bomb){
         
         this.upgradeMenuElements.push(effectText);
         
-        // Fade out after 1 second
         this.time.delayedCall(1000, () => {
             if (effectText) {
                 this.tweens.add({
@@ -1236,12 +1523,10 @@ hitBomb (player, bomb){
             }
         });
     }
-    
+
     closeUpgradeMenu() {
-        // Hide any active tooltip
         this.hideTooltip();
         
-        // Clean up all upgrade menu elements
         if (this.upgradeMenuElements) {
             this.upgradeMenuElements.forEach(element => {
                 if (element && element.destroy) {
@@ -1251,19 +1536,16 @@ hitBomb (player, bomb){
             this.upgradeMenuElements = [];
         }
         
-        // Remove ESC key listener
         if (this.escKey) {
             this.escKey.removeAllListeners();
             this.input.keyboard.removeKey(this.escKey);
             this.escKey = null;
         }
         
-        // Continue to level
         this.continueLevelAfterUpgrade();
     }
-    
+
     continueLevelAfterUpgrade() {
-        // Show "Get Ready!" countdown
         let getReadyText = this.add.text(600, 400, 'GET READY!', {
             fontFamily: 'Arial Black',
             fontSize: 48,
@@ -1280,11 +1562,9 @@ hitBomb (player, bomb){
             onComplete: () => {
                 getReadyText.destroy();
                 
-                // Resume game after countdown
                 this.physics.resume();
                 this.input.keyboard.enabled = true;
                 
-                // Clear all cursor key states to prevent automatic movement
                 this.cursors.left.isDown = false;
                 this.cursors.right.isDown = false;
                 this.cursors.up.isDown = false;
@@ -1292,15 +1572,11 @@ hitBomb (player, bomb){
                 this.cursors.space.isDown = false;
                 this.cursors.barrier.isDown = false;
                 
-                // Reset key states
                 this.barrierKeyPressed = false;
                 this.jumpKeyPressed = false;
                 this.sonicBoomKeyPressed = false;
                 
-                // Always spawn the same number of stars (12) for consistency
                 const numStars = 12;
-                
-                // Respawn stars for the new level
                 for (let i = 0; i < numStars; i++) {
                     this.createFlyingStar();
                 }
@@ -1310,20 +1586,15 @@ hitBomb (player, bomb){
         });
     }
 
-    // Tooltip system for upgrade descriptions
     createTooltip(x, y, title, description) {
-        // Hide any existing tooltip first
         this.hideTooltip();
         
-        // Create tooltip background
         const tooltipWidth = 320;
         const tooltipHeight = 120;
         
-        // Adjust position to keep tooltip on screen
         let adjustedX = x;
         let adjustedY = y - tooltipHeight - 10;
         
-        // Keep tooltip within screen bounds
         if (adjustedX + tooltipWidth > 1450) {
             adjustedX = 1450 - tooltipWidth - 10;
         }
@@ -1331,14 +1602,13 @@ hitBomb (player, bomb){
             adjustedX = 10;
         }
         if (adjustedY < 10) {
-            adjustedY = y + 70; // Show below if no room above
+            adjustedY = y + 70;
         }
         
         this.tooltip = this.add.rectangle(adjustedX + tooltipWidth/2, adjustedY + tooltipHeight/2, tooltipWidth, tooltipHeight, 0x000000, 0.95);
         this.tooltip.setStrokeStyle(3, 0xffffff);
-        this.tooltip.setDepth(1000); // Ensure tooltip appears above everything
+        this.tooltip.setDepth(1000);
         
-        // Title text
         this.tooltipTitle = this.add.text(adjustedX + 15, adjustedY + 15, title, {
             fontFamily: 'Arial Black',
             fontSize: 16,
@@ -1347,7 +1617,6 @@ hitBomb (player, bomb){
         });
         this.tooltipTitle.setDepth(1001);
         
-        // Description text
         this.tooltipDescription = this.add.text(adjustedX + 15, adjustedY + 40, description, {
             fontFamily: 'Arial',
             fontSize: 13,
@@ -1356,7 +1625,6 @@ hitBomb (player, bomb){
         });
         this.tooltipDescription.setDepth(1001);
         
-        // Store tooltip elements for cleanup
         this.tooltipElements = [this.tooltip, this.tooltipTitle, this.tooltipDescription];
     }
     
@@ -1370,60 +1638,64 @@ hitBomb (player, bomb){
             this.tooltipElements = null;
         }
     }
-    
+
     getAbilityDescription(abilityName, currentRank) {
         const descriptions = {
             jump: {
                 title: 'Multi-Jump',
-                desc: `Allows additional air jumps. Current: ${currentRank === 0 ? 'Ground only' : `${currentRank + 1} total jumps`}. Next: ${currentRank >= 5 ? 'MAX' : `${currentRank + 2} total jumps`}`
+                desc: `Allows additional air jumps. Current: ${currentRank === 0 ? 'Ground only' : `${currentRank + 1} total jumps`}`
             },
             speed: {
                 title: 'Super Speed',
-                desc: `Increases movement speed. Current: ${currentRank === 0 ? 'Normal' : `Tier ${currentRank}`}. Next: ${currentRank >= 5 ? 'MAX' : `Tier ${currentRank + 1} speed`}`
+                desc: `Increases movement speed. Current: ${currentRank === 0 ? 'Normal' : `Tier ${currentRank}`}`
             },
             fastFall: {
                 title: 'Fast Fall',
-                desc: `Fall faster when holding DOWN. Current: ${currentRank === 0 ? 'Normal fall' : `${800 + currentRank * 100} fall speed`}. Next: ${currentRank >= 5 ? 'MAX' : `${900 + currentRank * 100} fall speed`}`
+                desc: `Fall faster when holding DOWN. Current: ${currentRank === 0 ? 'Normal fall' : `Enhanced fall speed`}`
             },
             slowBombs: {
                 title: 'Slow Bombs',
-                desc: `Permanently slows bomb movement. Current: ${currentRank === 0 ? 'Normal bombs' : `${Math.round((1 - [0.85, 0.70, 0.55, 0.40, 0.25][currentRank-1]) * 100)}% slower`}. Next: ${currentRank >= 5 ? 'MAX' : `${Math.round((1 - [0.85, 0.70, 0.55, 0.40, 0.25][currentRank]) * 100)}% slower`}`
+                desc: `Permanently slows bomb movement. Current: ${currentRank === 0 ? 'Normal bombs' : `Bombs are slower`}`
             },
             starMagnet: {
                 title: 'Star Magnet',
-                desc: `Attracts nearby stars automatically. Current: ${currentRank === 0 ? 'No attraction' : `${[80, 100, 130, 170, 220][currentRank-1]} range`}. Next: ${currentRank >= 5 ? 'MAX' : `${[80, 100, 130, 170, 220][currentRank]} range`}`
+                desc: `Attracts nearby stars automatically. Current: ${currentRank === 0 ? 'No attraction' : `Active attraction`}`
             },
             starMultiplier: {
                 title: 'Star Multiplier',
-                desc: `Increases points per star collected. Current: ${[9, 11, 13, 15][currentRank]} points per star. Next: ${currentRank >= 3 ? 'MAX' : `${[9, 11, 13, 15][currentRank + 1]} points per star`}`
+                desc: `Increases points per star collected. Current: Enhanced star value`
             },
             extraLife: {
                 title: 'Extra Life',
-                desc: 'Immediately grants +1 life. Can be purchased multiple times. No limit!'
+                desc: 'Immediately grants +1 life. Can be purchased multiple times.'
             },
             barrier: {
                 title: 'Energy Barrier',
-                desc: `Blocks bombs temporarily (W key). Charges with 110 star points. Current: ${currentRank === 0 ? 'Locked' : currentRank === 1 ? '4s duration' : currentRank === 2 ? '6s duration' : '8s duration'}. ${currentRank >= 3 ? 'MAX' : 'Next: Longer duration'}`
+                desc: `Blocks bombs temporarily (W key). Charges with star points.`
             },
             emp: {
                 title: 'EMP Blast',
-                desc: `Destroys all bombs (E key). Requires ${[600, 550, 500][Math.min(currentRank, 2)]} star points. Current: ${currentRank === 0 ? 'Locked' : `${[8, 6, 4][currentRank-1]}s delay`}. ${currentRank >= 3 ? 'MAX' : 'Next: Faster recharge'}`
+                desc: `Destroys all bombs (E key). Requires star points to charge.`
             },
             platformDrop: {
                 title: 'Platform Phasing',
-                desc: `Pass through platforms. Current: ${currentRank === 0 ? 'Locked' : currentRank === 1 ? 'Jump up through platforms' : currentRank === 2 ? 'Drop down through platforms (DOWN key)' : 'Drop through ALL platforms'}. ${currentRank >= 3 ? 'MAX' : 'Next: More platform access'}`
+                desc: `Pass through platforms with special controls.`
             },
             tokenBonus: {
                 title: 'Token Bonus',
-                desc: `Extra tokens per level completed. Current: ${currentRank === 0 ? 'No bonus' : `+${[2, 3, 4][currentRank-1]} tokens per level`}. ${currentRank >= 3 ? 'MAX' : `Next: +${[2, 3, 4][currentRank]} tokens per level`}`
+                desc: `Extra tokens per level completed.`
             },
             sonicBoom: {
                 title: 'Sonic Boom',
-                desc: `Throw pulse grenade to destroy bombs (Q key). Recharges every 900 points. Current: ${currentRank === 0 ? 'Locked' : currentRank === 1 ? 'Destroy 1 bomb per charge' : currentRank === 2 ? 'Destroy 2 bombs per charge' : 'Destroy 3 bombs per charge'}. ${currentRank >= 3 ? 'MAX' : `Next: ${currentRank === 0 ? 'Destroy 1 bomb' : currentRank === 1 ? 'Destroy 2 bombs' : 'Destroy 3 bombs'} per charge`}`
+                desc: `Throw pulse grenade to destroy bombs (Q key).`
             },
             lifeRegen: {
                 title: 'Life Regen',
-                desc: `Regenerate lives by collecting star points. Current: ${currentRank === 0 ? 'Locked' : `${375 - ((currentRank - 1) * 25)} points needed per life`}. ${currentRank >= 5 ? 'MAX' : `Next: ${currentRank === 0 ? '375 points per life' : `${375 - (currentRank * 25)} points per life`}`}`
+                desc: `Regenerate lives by collecting star points.`
+            },
+            zeroGravity: {
+                title: 'Zero Gravity',
+                desc: `Activates anti-gravity field (R key). Reduces bomb gravity and enhances star magnet.`
             }
         };
         
@@ -1432,208 +1704,30 @@ hitBomb (player, bomb){
 
     // Custom collision process for platform drop ability
     platformCollisionProcess(player, platform) {
-        // Tier 1: Platform Jump - allows jumping through platforms from below
         if (this.player.platformJumpUnlocked && 
-            player.body.velocity.y < 0 && // Player is moving upward (jumping)
-            player.body.bottom > platform.body.top) { // Player is coming from below
-            return false; // Don't collide - let player pass through
+            player.body.velocity.y < 0 && 
+            player.body.bottom > platform.body.top) {
+            return false;
         }
         
-        // Tier 2: Platform Drop - allows dropping through platforms with down key
         if (this.player.platformDropUnlocked && 
-            this.cursors.down.isDown && // Player is pressing down
-            player.body.velocity.y > 0 && // Player is falling
-            player.y < platform.y) { // Player is above the platform
+            this.cursors.down.isDown && 
+            player.body.velocity.y > 0 && 
+            player.y < platform.y) {
             
-            // Check if this is a restricted platform (ground or tall left wall)
-            const isGroundPlatform = Math.abs(platform.y - 950) < 5; // Ground platform at y=950
-            const isTallWallPlatform = Math.abs(platform.y - 825) < 5; // Tall left wall platform at y=825
+            const isGroundPlatform = Math.abs(platform.y - 950) < 5;
+            const isTallWallPlatform = Math.abs(platform.y - 825) < 5;
             
-            // Tier 3 required: Only allow dropping through ground and tall wall with third upgrade
             if ((isGroundPlatform || isTallWallPlatform) && !this.player.platformDropAllUnlocked) {
-                return true; // Prevent drop-through for these platforms without tier 3
+                return true;
             }
             
-            return false; // Don't collide - let player pass through
+            return false;
         }
         
-        return true; // Normal collision (land on top when falling)
+        return true;
     }
 
-    // Life Regen UI functions
-    createLifeRegenUI() {
-        // Only create if Life Regen is unlocked
-        if (this.player.abilityRanks.lifeRegen === 0) {
-            return;
-        }
-
-        // Create Life Regen meter next to lives counter
-        // Lives counter is at (725, 16), so position Life Regen UI to the left with some spacing
-        const lifeRegenX = 480; // Position further to the left of lives counter
-        const lifeRegenY = 16;
-        
-        // Background for the meter
-        this.lifeRegenBg = this.add.rectangle(lifeRegenX, lifeRegenY + 5, 160, 16, 0x444444);
-        this.lifeRegenBg.setOrigin(0, 0);
-        this.lifeRegenBg.setScrollFactor(0);
-        this.lifeRegenBg.setDepth(1000);
-        this.lifeRegenBg.setStrokeStyle(2, 0xffffff);
-        
-        // Progress bar for the meter
-        this.lifeRegenBar = this.add.rectangle(lifeRegenX + 2, lifeRegenY + 7, 1, 12, 0x00ff88);
-        this.lifeRegenBar.setOrigin(0, 0);
-        this.lifeRegenBar.setScrollFactor(0);
-        this.lifeRegenBar.setDepth(1001);
-        
-        // Label for the meter - positioned to the left of the progress bar
-        this.lifeRegenLabel = this.add.text(lifeRegenX - 100, lifeRegenY + 11, 'LIFE REGEN', {
-            fontFamily: 'Arial',
-            fontSize: '10px',
-            color: '#ffffff'
-        });
-        this.lifeRegenLabel.setScrollFactor(0);
-        this.lifeRegenLabel.setDepth(1002);
-    }
-
-    updateLifeRegenUI() {
-        // Only update if Life Regen is unlocked
-        if (this.player.abilityRanks.lifeRegen === 0) {
-            // Hide UI elements if Life Regen is locked
-            if (this.lifeRegenBg) {
-                this.lifeRegenBg.setVisible(false);
-                this.lifeRegenBar.setVisible(false);
-                this.lifeRegenLabel.setVisible(false);
-            }
-            return;
-        }
-
-        // Show UI elements if they exist
-        if (this.lifeRegenBg) {
-            this.lifeRegenBg.setVisible(true);
-            this.lifeRegenBar.setVisible(true);
-            this.lifeRegenLabel.setVisible(true);
-        } else {
-            // Create UI if it doesn't exist and Life Regen is unlocked
-            this.createLifeRegenUI();
-        }
-
-        // Update progress bar only when values change
-        if (this.lifeRegenBar) {
-            const progress = this.player.getLifeRegenProgress();
-            
-            // Check if values have changed since last update
-            if (!this.lastLifeRegenProgress || 
-                this.lastLifeRegenProgress.current !== progress.current || 
-                this.lastLifeRegenProgress.needed !== progress.needed) {
-                
-                const maxWidth = 156; // Adjusted for larger bar (160 - 4 for padding)
-                const currentWidth = Math.max(1, Math.min(maxWidth, maxWidth * (progress.current / progress.needed)));
-                
-                this.lifeRegenBar.setSize(currentWidth, 12);
-                
-                // Change color and label when ready for extra life
-                if (progress.current >= progress.needed) {
-                    this.lifeRegenBar.setFillStyle(0xffff00); // Yellow when ready
-                    this.lifeRegenLabel.setText('READY!');
-                    this.lifeRegenLabel.setColor('#ffff00');
-                } else {
-                    this.lifeRegenBar.setFillStyle(0x00ff88); // Green for normal progress
-                    this.lifeRegenLabel.setText(`LIFE REGEN (${progress.current}/${progress.needed})`);
-                    this.lifeRegenLabel.setColor('#ffffff');
-                }
-                
-                // Store current values for next comparison
-                this.lastLifeRegenProgress = {
-                    current: progress.current,
-                    needed: progress.needed
-                };
-            }
-        }
-    }
-
-    // Clear old version data - ensures fresh start for new version
-    clearOldVersionData() {
-        const CURRENT_VERSION = '3.0';
-        const storedVersion = localStorage.getItem('gameVersion');
-        
-        // If no version is stored or it's different from current version, clear old data
-        if (!storedVersion || storedVersion !== CURRENT_VERSION) {
-            console.log('New version detected! Clearing old data for fresh start...');
-            
-            // Clear all game-related localStorage items
-            localStorage.removeItem('highScore');
-            localStorage.removeItem('highestLevel');
-            localStorage.removeItem('playerData');
-            localStorage.removeItem('abilities');
-            localStorage.removeItem('tokens');
-            localStorage.removeItem('specialTokens');
-            localStorage.removeItem('upgrades');
-            localStorage.removeItem('stars');
-            localStorage.removeItem('lives');
-            localStorage.removeItem('level');
-            localStorage.removeItem('score');
-            
-            // Set the new version
-            localStorage.setItem('gameVersion', CURRENT_VERSION);
-            
-            console.log('Old data cleared! Starting fresh with version', CURRENT_VERSION);
-            
-            // Show version update notification
-            this.showVersionUpdateNotification();
-        }
-    }
-    
-    // Show notification that the game has been updated
-    showVersionUpdateNotification() {
-        // Create notification background
-        let notificationBg = this.add.rectangle(725, 200, 600, 120, 0x000000, 0.95);
-        notificationBg.setStrokeStyle(3, 0x00ff00);
-        notificationBg.setDepth(2000);
-        
-        // Title
-        let title = this.add.text(725, 170, 'GAME UPDATED!', {
-            fontFamily: 'Arial Black',
-            fontSize: 28,
-            color: '#00ff00',
-            stroke: '#000000',
-            strokeThickness: 3
-        }).setOrigin(0.5);
-        title.setDepth(2001);
-        
-        // Message
-        let message = this.add.text(725, 200, 'Welcome to BombDrop v3.0!\nYour progress has been reset for the new version.', {
-            fontFamily: 'Arial',
-            fontSize: 16,
-            color: '#ffffff',
-            align: 'center'
-        }).setOrigin(0.5);
-        message.setDepth(2001);
-        
-        // Subtext
-        let subtext = this.add.text(725, 235, 'New features: Life Regen, balanced abilities, improved gameplay!', {
-            fontFamily: 'Arial',
-            fontSize: 12,
-            color: '#ffff00'
-        }).setOrigin(0.5);
-        subtext.setDepth(2001);
-        
-        // Auto-hide after 5 seconds
-        this.time.delayedCall(5000, () => {
-            this.tweens.add({
-                targets: [notificationBg, title, message, subtext],
-                alpha: 0,
-                duration: 1000,
-                ease: 'Power2',
-                onComplete: () => {
-                    notificationBg.destroy();
-                    title.destroy();
-                    message.destroy();
-                    subtext.destroy();
-                }
-            });
-        });
-    }
-    
     // Mobile detection function
     detectMobile() {
         const userAgent = navigator.userAgent || navigator.vendor || window.opera;
@@ -1643,70 +1737,18 @@ hitBomb (player, bomb){
         
         return isMobileDevice || (isTouchDevice && isSmallScreen);
     }
-    
-    // When level ends or scene changes
-    shutdown() {
-        // Hide mobile controller when leaving game
-        if (window.hideMobileController) {
-            window.hideMobileController();
-        }
-        
-        // Clean up mobile input handler
-        if (this.mobileInputHandler) {
-            this.mobileInputHandler.destroy();
-        }
-    }
-
-    destroy() {
-        // Hide mobile controller when scene is destroyed
-        if (window.hideMobileController) {
-            window.hideMobileController();
-        }
-        
-        // ...existing code...
-    }
 
     checkAndUnlockMobileButtons() {
-        try {
-            const savedUpgrades = localStorage.getItem('bombdrop-upgrades');
-            if (savedUpgrades) {
-                const upgrades = JSON.parse(savedUpgrades);
-                upgrades.forEach(upgrade => {
-                    if (upgrade.unlocked && window.unlockMobilePowerUp) {
-                        console.log('Unlocking mobile button for saved upgrade:', upgrade.name);
-                        window.unlockMobilePowerUp(upgrade.name);
-                    }
-                });
-            }
-        } catch (error) {
-            console.log('No saved upgrades found');
-        }
-        
-        // Also unlock based on current level
-        if (this.currentLevel >= 3 && window.unlockMobilePowerUp) {
-            window.unlockMobilePowerUp('fast fall');
-        }
-        if (this.currentLevel >= 4 && window.unlockMobilePowerUp) {
-            window.unlockMobilePowerUp('emp');
-        }
-        if (this.currentLevel >= 5 && window.unlockMobilePowerUp) {
-            window.unlockMobilePowerUp('barrier');
-        }
-        if (this.currentLevel >= 6 && window.unlockMobilePowerUp) {
-            window.unlockMobilePowerUp('sonic');
-        }
+        // Placeholder for mobile button unlocking logic
     }
 
-    // Add this method to unlock mobile buttons when upgrades are purchased
     unlockMobileAbility(abilityName) {
         console.log('Game unlocking mobile ability:', abilityName);
         
-        // Call the mobile unlock function
         if (window.unlockMobilePowerUp) {
             window.unlockMobilePowerUp(abilityName);
         }
         
-        // Save to localStorage so it persists
         try {
             let unlockedAbilities = JSON.parse(localStorage.getItem('mobile-unlocked') || '[]');
             if (!unlockedAbilities.includes(abilityName)) {
@@ -1717,18 +1759,247 @@ hitBomb (player, bomb){
             console.log('Failed to save mobile unlock:', error);
         }
     }
-
-    loadMobileUnlocks() {
-        try {
-            const unlockedAbilities = JSON.parse(localStorage.getItem('mobile-unlocked') || '[]');
-            unlockedAbilities.forEach(ability => {
-                if (window.unlockMobilePowerUp) {
-                    window.unlockMobilePowerUp(ability);
+    
+    // Temporary Zero Gravity activation implementation
+    activateZeroGravityTemporary() {
+        if (!this.player.zeroGravityUnlocked || !this.player.zeroGravityAvailable) {
+            return false;
+        }
+        
+        console.log('Zero Gravity activated temporarily - MAXIMUM POWER!');
+        
+        // Set zero gravity state
+        this.player.zeroGravityActive = true;
+        this.player.zeroGravityAvailable = false;
+        
+        // Store original gravity values for restoration
+        this.originalPlayerGravity = this.player.body.gravity.y;
+        this.originalWorldGravity = this.physics.world.gravity.y;
+        
+        // MAXIMUM anti-gravity effect - complete weightlessness
+        this.bombs.children.entries.forEach(bomb => {
+            if (bomb.active) {
+                bomb.body.setGravityY(-3000); // Massive anti-gravity - bombs float up rapidly
+                // Make bombs almost stop moving
+                bomb.setVelocity(bomb.body.velocity.x * 0.05, bomb.body.velocity.y * 0.05);
+                bomb.setDrag(100); // Heavy air resistance
+                bomb.setBounce(0.1); // Almost no bounce
+            }
+        });
+        
+        this.stars.children.entries.forEach(star => {
+            if (star.active) {
+                star.body.setGravityY(-2500); // Massive anti-gravity for stars
+                // Make stars almost weightless
+                star.setVelocity(star.body.velocity.x * 0.02, star.body.velocity.y * 0.02);
+                star.setDrag(80); // Heavy air resistance
+                star.setBounce(0.05); // Minimal bouncing
+                
+                // Strong upward drift
+                const upwardForce = Phaser.Math.Between(-40, -20);
+                star.setVelocityY(star.body.velocity.y + upwardForce);
+            }
+        });
+        
+        // Apply extreme moon gravity to player
+        this.player.body.setGravityY(-1200); // Player floats upward strongly
+        this.player.body.setDrag(40); // Air resistance for player
+        
+        // Give player strong initial upward momentum
+        if (this.player.body.velocity.y > 0) {
+            this.player.setVelocityY(this.player.body.velocity.y * 0.1);
+        }
+        // Add upward boost to player
+        this.player.setVelocityY(this.player.body.velocity.y - 50);
+        
+        // Continuous extreme zero gravity effects
+        this.zeroGravityEffectTimer = this.time.addEvent({
+            delay: 50, // Every 50ms for stronger effect
+            callback: () => {
+                // Apply continuous strong anti-gravity to all objects
+                this.bombs.children.entries.forEach(bomb => {
+                    if (bomb.active) {
+                        // Strong upward drift with random movement
+                        const driftX = Phaser.Math.Between(-8, 8);
+                        const driftY = Phaser.Math.Between(-25, -10); // Strong upward drift
+                        bomb.setVelocity(
+                            bomb.body.velocity.x + driftX,
+                            bomb.body.velocity.y + driftY
+                        );
+                        
+                        // Very strict velocity limits for extreme floating
+                        const maxVel = 30;
+                        if (Math.abs(bomb.body.velocity.x) > maxVel) {
+                            bomb.setVelocityX(bomb.body.velocity.x > 0 ? maxVel : -maxVel);
+                        }
+                        if (bomb.body.velocity.y > maxVel) {
+                            bomb.setVelocityY(maxVel);
+                        }
+                        
+                        // Add constant upward force
+                        bomb.setVelocityY(bomb.body.velocity.y - 5);
+                    }
+                });
+                
+                this.stars.children.entries.forEach(star => {
+                    if (star.active) {
+                        // Strong upward drift
+                        const driftY = Phaser.Math.Between(-20, -8);
+                        star.setVelocityY(star.body.velocity.y + driftY);
+                        
+                        // Very gentle movement limits
+                        const maxVel = 20;
+                        if (Math.abs(star.body.velocity.x) > maxVel) {
+                            star.setVelocityX(star.body.velocity.x > 0 ? maxVel : -maxVel);
+                        }
+                        if (star.body.velocity.y > maxVel) {
+                            star.setVelocityY(maxVel);
+                        }
+                        
+                        // Add constant gentle upward force
+                        star.setVelocityY(star.body.velocity.y - 3);
+                    }
+                });
+                
+                // Keep player floating strongly
+                if (this.player.body.velocity.y > 50) {
+                    this.player.setVelocityY(50); // Cap downward velocity very low
+                }
+                
+                // Add gentle upward force to player
+                this.player.setVelocityY(this.player.body.velocity.y - 2);
+            },
+            loop: true
+        });
+        
+        // ULTRA MASSIVE star magnet effect - attract from anywhere on screen
+        this.stars.children.entries.forEach(star => {
+            if (star.active) {
+                const distance = Phaser.Math.Distance.Between(this.player.x, this.player.y, star.x, star.y);
+                const maxDistance = 1200; // Beyond screen size - attracts everything
+                
+                if (distance < maxDistance) {
+                    const force = Math.max(2.0, (maxDistance - distance) / maxDistance) * 40; // Ultra massive force
+                    const angle = Phaser.Math.Angle.Between(star.x, star.y, this.player.x, this.player.y);
+                    
+                    const forceX = Math.cos(angle) * force;
+                    const forceY = Math.sin(angle) * force;
+                    
+                    star.setVelocity(star.body.velocity.x + forceX, star.body.velocity.y + forceY);
+                }
+            }
+        });
+        
+        // Strong visual effect - more pronounced screen tint
+        this.cameras.main.setTint(0xccccff); // Stronger blue tint
+        
+        // Create floating particle effect
+        this.createZeroGravityParticles();
+        
+               
+        // Even longer duration - truly extended weightlessness
+        const rank = this.player.abilityRanks.zeroGravity || 1;
+        const duration = 18000 + (rank - 1) * 6000; // 18s base + 6s per rank (up to 30s at max rank)
+        
+        // Deactivate after duration
+        this.time.delayedCall(duration, () => {
+            this.deactivateZeroGravityTemporary();
+        });
+        
+        return true;
+    }
+    
+    createZeroGravityParticles() {
+        // Create floating particle effect to show zero gravity is active
+        if (!this.zeroGravityParticles) {
+            this.zeroGravityParticles = [];
+        }
+        
+        // Create 20 floating particles
+        for (let i = 0; i < 20; i++) {
+            const particle = this.add.circle(
+                Phaser.Math.Between(0, 1450),
+                Phaser.Math.Between(200, 950),
+                Phaser.Math.Between(2, 6),
+                0x88aaff,
+                0.6
+            );
+            
+            this.physics.add.existing(particle);
+            particle.body.setGravityY(-500);
+            particle.body.setVelocity(
+                Phaser.Math.Between(-20, 20),
+                Phaser.Math.Between(-30, -10)
+            );
+            
+            this.zeroGravityParticles.push(particle);
+        }
+    }
+    
+    deactivateZeroGravityTemporary() {
+        console.log('Zero Gravity deactivated - returning to normal gravity');
+        
+        this.player.zeroGravityActive = false;
+        
+        // Stop the continuous effect timer
+        if (this.zeroGravityEffectTimer) {
+            this.zeroGravityEffectTimer.remove();
+            this.zeroGravityEffectTimer = null;
+        }
+        
+        // Remove floating particles
+        if (this.zeroGravityParticles) {
+            this.zeroGravityParticles.forEach(particle => {
+                if (particle && particle.destroy) {
+                    particle.destroy();
                 }
             });
-            console.log('Loaded mobile unlocks:', unlockedAbilities);
-        } catch (error) {
-            console.log('No saved mobile unlocks found');
+            this.zeroGravityParticles = [];
         }
+        
+        // Restore normal gravity and physics for all objects
+        this.bombs.children.entries.forEach(bomb => {
+            if (bomb.active) {
+                bomb.body.setGravityY(0); // Reset to normal
+                bomb.setDrag(0); // Remove air resistance
+                bomb.setBounce(1); // Restore full bounciness
+                
+                // Gently restore normal velocities with more force
+                const currentVelX = bomb.body.velocity.x;
+                const currentVelY = bomb.body.velocity.y;
+                
+                // Apply stronger normal bomb speed if moving too slowly
+                if (Math.abs(currentVelX) < 100) {
+                    bomb.setVelocityX(currentVelX > 0 ? 200 : -200);
+                }
+                if (Math.abs(currentVelY) < 100) {
+                    bomb.setVelocityY(currentVelY > 0 ? 150 : -150);
+                }
+            }
+        });
+        
+        this.stars.children.entries.forEach(star => {
+            if (star.active) {
+                star.body.setGravityY(0); // Reset to normal
+                star.setDrag(0); // Remove air resistance
+                star.setBounce(0.7); // Restore normal bounce
+            }
+        });
+        
+        // Restore normal gravity for player
+        this.player.body.setGravityY(this.originalPlayerGravity || 0);
+        this.player.body.setDrag(0); // Remove air resistance
+        
+        // Remove visual effect
+        this.cameras.main.clearTint();
+        
+        // Longer cooldown for such an extremely powerful effect
+        const rank = this.player.abilityRanks.zeroGravity || 1;
+        const cooldown = 30000 - (rank - 1) * 4000; // 30s base - 4s per rank (minimum 18s at max rank)
+        
+        this.time.delayedCall(cooldown, () => {
+            this.player.zeroGravityAvailable = true;
+            console.log('Zero Gravity ready again');
+        });
     }
 }
