@@ -138,122 +138,88 @@
                 width: 100%;
             }
             
-            /* Bottom row for fast fall and power-ups */
+            /* Bottom row layout with centered down button */
             .controller-bottom-row {
                 display: flex;
-                justify-content: space-between;
+                justify-content: center;
                 align-items: center;
                 width: 100%;
                 padding: 0 20px;
+                position: relative;
             }
             
-            /* Action buttons container */
-            .action-controls {
+            /* Left side abilities - positioned absolutely to left */
+            .left-abilities {
                 display: flex;
-                gap: 8px;
+                gap: 12px;
                 align-items: center;
-                flex-wrap: nowrap;
-                justify-content: center;
+                position: absolute;
+                left: 20px;
             }
             
-            /* Jump button - smaller and centered with other buttons */
-            .jump-btn {
+            /* Right side abilities - positioned absolutely to right */
+            .right-abilities {
+                display: flex;
+                gap: 12px;
+                align-items: center;
+                position: absolute;
+                right: 20px;
+            }
+            
+            /* Premium ability buttons - larger circular */
+            .ability-btn {
                 width: 60px;
                 height: 60px;
+                font-size: 24px;
+                border-radius: 50%;
+                border: 2px solid rgba(255, 255, 255, 0.5);
+                text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+                font-weight: bold;
+                color: #ffffff;
+            }
+            
+            .barrier-btn {
+                background: linear-gradient(135deg, rgba(155, 89, 182, 0.8), rgba(142, 68, 173, 0.8));
+                border-radius: 50%;
+            }
+            
+            .emp-btn {
+                background: linear-gradient(135deg, rgba(243, 156, 18, 0.8), rgba(230, 126, 34, 0.8));
+                border-radius: 50%;
+            }
+            
+            .sonic-btn {
+                background: linear-gradient(135deg, rgba(135, 206, 235, 0.8), rgba(107, 182, 224, 0.8));
+                border-radius: 50%;
+            }
+            
+            /* Jump button - larger size */
+            .jump-btn {
+                width: 70px;
+                height: 70px;
                 background: linear-gradient(135deg, #50c878, #3da55c);
-                font-size: 22px;
-            }
-            
-            /* Move buttons - consistent styling */
-            .move-btn {
-                width: 50px;
-                height: 40px;
-                background: linear-gradient(135deg, #4a90e2, #357abd);
-                font-size: 18px;
-                border-radius: 6px;
-                border: 2px solid rgba(255, 255, 255, 0.3);
-            }
-            
-            /* Fast fall button - disabled state */
-            .fast-fall-btn {
-                background: linear-gradient(135deg, #666, #555);
-                opacity: 0.5;
-            }
-            
-            /* Fast fall button - enabled state */
-            .fast-fall-btn:not(:disabled) {
-                background: linear-gradient(135deg, #4a90e2, #357abd) !important;
-                opacity: 1 !important;
-                border: 2px solid rgba(255, 255, 255, 0.5) !important;
-                box-shadow: 0 0 8px rgba(74, 144, 226, 0.4) !important;
-            }
-            
-            /* Add missing ability button styling */
-            .ability-btn {
-                width: 50px;
-                height: 50px;
-                font-size: 16px;
+                font-size: 26px;
                 border-radius: 50%;
                 border: 2px solid rgba(255, 255, 255, 0.3);
             }
             
-            .barrier-btn {
-                background: linear-gradient(135deg, #9b59b6, #8e44ad);
+            /* Move buttons - larger size */
+            .move-btn {
+                width: 60px;
+                height: 50px;
+                background: linear-gradient(135deg, #4a90e2, #357abd);
+                font-size: 22px;
+                border-radius: 6px;
+                border: 2px solid rgba(255, 255, 255, 0.3);
             }
             
-            .emp-btn {
-                background: linear-gradient(135deg, #f39c12, #e67e22);
+            /* Fast fall button - centered like jump button */
+            #fast-fall {
+                position: relative;
+                z-index: 2;
             }
             
-            .sonic-btn {
-                background: linear-gradient(135deg, #e74c3c, #c0392b);
-            }
-            
-            /* Button base styling */
-            .control-btn {
-                border: none;
-                color: white;
-                font-weight: bold;
-                cursor: pointer;
-                transition: all 0.2s ease;
-                box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
-                font-family: Arial, sans-serif;
-                user-select: none;
-                -webkit-user-select: none;
-                touch-action: manipulation;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                text-align: center;
-                line-height: 1;
-            }
-            
-            /* Disabled button styling */
-            .control-btn:disabled {
-                opacity: 0.5;
-                background: linear-gradient(135deg, #666, #555) !important;
-                cursor: not-allowed;
-            }
-        }
-
-        ol, ul {
-            list-style: none;
-        }
-
-        img, video {
-            max-width: 100%;
-            height: auto;
-            display: block;
-        }
-
-        a {
-            text-decoration: none;
-            color: inherit;
-        }
-
-        /* Mobile upgrade UI improvements */
-        @media (max-width: 768px), (max-height: 768px) {
-            /* Make all game text larger on mobile */
+            /* Mobile game text scaling */
             .phaser-game-object {
                 transform: scale(1.2);
             }
@@ -270,8 +236,8 @@
                 /* Increase overall text rendering scale */
                 text-size-adjust: 150%;
                 -webkit-text-size-adjust: 150%;
-                -moz-text-size-adjust: 150%;
-                -ms-text-size-adjust: 150%;
+                -moz-text-size_adjust: 150%;
+                -ms-text-size_adjust: 150%;
             }
             
             /* Scale game canvas text elements */
@@ -313,19 +279,22 @@
             <button class="control-btn move-btn" id="move-right">→</button>
         </div>
         
-        <!-- Bottom Row - Fast Fall and Power-ups -->
+        <!-- Bottom Row - Fast Fall centered with Power-ups on sides -->
         <div class="controller-bottom-row">
-            <button class="control-btn move-btn fast-fall-btn" id="fast-fall" disabled>
-                ↓
-            </button>
-            
-            <div class="action-controls">
+            <div class="left-abilities">
                 <button class="control-btn ability-btn barrier-btn" id="barrier" disabled>
                     🛡️
                 </button>
                 <button class="control-btn ability-btn emp-btn" id="emp" disabled>
                     ⚡
                 </button>
+            </div>
+            
+            <button class="control-btn move-btn fast-fall-btn" id="fast-fall" disabled>
+                ↓
+            </button>
+            
+            <div class="right-abilities">
                 <button class="control-btn ability-btn sonic-btn" id="sonic" disabled>
                     🔊
                 </button>
@@ -685,14 +654,23 @@
                     button.classList.remove('fast-fall-btn');
                     button.classList.add('move-btn');
                 } else if (buttonId === 'emp') {
-                    button.style.background = 'linear-gradient(135deg, #f39c12, #e67e22)';
+                    button.style.background = 'linear-gradient(135deg, rgba(243, 156, 18, 0.8), rgba(230, 126, 34, 0.8))';
                     button.style.border = '2px solid rgba(255, 255, 255, 0.5)';
+                    button.style.textShadow = '0 1px 3px rgba(0, 0, 0, 0.8)';
+                    button.style.color = '#ffffff';
+                    button.style.fontWeight = 'bold';
                 } else if (buttonId === 'barrier') {
-                    button.style.background = 'linear-gradient(135deg, #9b59b6, #8e44ad)';
+                    button.style.background = 'linear-gradient(135deg, rgba(155, 89, 182, 0.8), rgba(142, 68, 173, 0.8))';
                     button.style.border = '2px solid rgba(255, 255, 255, 0.5)';
+                    button.style.textShadow = '0 1px 3px rgba(0, 0, 0, 0.8)';
+                    button.style.color = '#ffffff';
+                    button.style.fontWeight = 'bold';
                 } else if (buttonId === 'sonic') {
-                    button.style.background = 'linear-gradient(135deg, #e74c3c, #c0392b)';
+                    button.style.background = 'linear-gradient(135deg, rgba(135, 206, 235, 0.8), rgba(107, 182, 224, 0.8))';
                     button.style.border = '2px solid rgba(255, 255, 255, 0.5)';
+                    button.style.textShadow = '0 1px 3px rgba(0, 0, 0, 0.8)';
+                    button.style.color = '#ffffff';
+                    button.style.fontWeight = 'bold';
                 }
                 
                 console.log(`${powerUpName} mobile button unlocked and styled!`);
