@@ -17,7 +17,30 @@ export class MainMenu extends Phaser.Scene {
         
         this.showingRules = false;
         this.createDynamicMenu();
-   }
+        
+        // Hide mobile controller in menu
+        if (window.hideMobileController) {
+            window.hideMobileController();
+        }
+        
+        // Ensure start button works properly
+        // Find your start/play button and make sure it transitions correctly
+        if (this.startButton || this.playButton) {
+            const button = this.startButton || this.playButton;
+            
+            button.on('pointerdown', () => {
+                console.log('Start game button pressed - transitioning to Game scene');
+                
+                // Clear any mobile controller modes that might interfere
+                if (window.hideMobileController) {
+                    window.hideMobileController();
+                }
+                
+                // Start the game scene
+                this.scene.start('Game');
+            });
+        }
+    }
     
     // Mobile detection function (same as in Game.js)
     detectMobile() {

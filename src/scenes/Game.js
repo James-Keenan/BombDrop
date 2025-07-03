@@ -8,6 +8,8 @@ export class Game extends Phaser.Scene {
     }
 
     create() {
+        console.log('Game scene create() called');
+        
         // Scale background to fit the new screen size (1450x950)
         let bg = this.add.image(725, 475, 'sky');
         bg.setScale(1450 / bg.width, 950 / bg.height);
@@ -141,22 +143,15 @@ export class Game extends Phaser.Scene {
         // Setup mobile input handler
         this.mobileInputHandler = new MobileInputHandler(this);
         
-        // Show mobile controller when level starts
-        if (window.showMobileController && !window.isInUpgradeMode()) {
-            window.showMobileController();
-        }
+        // Show mobile controller when game starts (with delay to ensure game is loaded)
+        setTimeout(() => {
+            if (window.showMobileControllerForGame) {
+                window.showMobileControllerForGame();
+            }
+        }, 200);
         
-        // Show mobile controller for game - use enhanced function
-        if (window.showMobileControllerForGame) {
-            window.showMobileControllerForGame();
-        } else if (window.showMobileController) {
-            window.showMobileController();
-        }
-        
-        // Auto-detect this scene
-        if (window.checkSceneAndUpdateController) {
-            window.checkSceneAndUpdateController('Game');
-        }
+        // Check for unlocked upgrades
+        this.checkAndUnlockMobileButtons();
     }
 
     update(time) {
@@ -460,7 +455,7 @@ hitBomb (player, bomb){
         
         // Ensure bomb maintains consistent bounce and doesn't lose velocity
         bomb.body.bounce.setTo(1, 1);
-        bomb.body.friction.setTo(0, 0);
+        bomb.body.friction.setTo(0);
         bomb.body.drag.setTo(0, 0);
         
         // Fixed bomb speed - no level scaling
@@ -1057,6 +1052,27 @@ hitBomb (player, bomb){
                 });
             }
             
+            // Unlock mobile buttons when abilities are first purchased
+            if (abilityName === 'fastFall' && this.player.abilityRanks.fastFall === 1) {
+                console.log('Fast Fall upgrade purchased, unlocking mobile button');
+                this.unlockMobileAbility('fast fall');
+            }
+            
+            if (abilityName === 'barrier' && this.player.abilityRanks.barrier === 1) {
+                console.log('Barrier upgrade purchased, unlocking mobile button');
+                this.unlockMobileAbility('barrier');
+            }
+            
+            if (abilityName === 'emp' && this.player.abilityRanks.emp === 1) {
+                console.log('EMP upgrade purchased, unlocking mobile button');
+                this.unlockMobileAbility('emp');
+            }
+            
+            if (abilityName === 'sonicBoom' && this.player.abilityRanks.sonicBoom === 1) {
+                console.log('Sonic Boom upgrade purchased, unlocking mobile button');
+                this.unlockMobileAbility('sonic');
+            }
+            
             // Update token display
             this.updateTokenUI();
             
@@ -1085,7 +1101,9 @@ hitBomb (player, bomb){
         this.createContinueButton();
         
         // Update current tokens display
-        this.upgradeMenuElements[3].setText(`Tokens: ${this.player.tokens}  Special: ${this.player.specialTokens}`);
+        if (this.upgradeMenuElements[3]) {
+            this.upgradeMenuElements[3].setText(`Tokens: ${this.player.tokens}  Special: ${this.player.specialTokens}`);
+        }
     }
     
     createContinueButton() {
@@ -1646,5 +1664,71 @@ hitBomb (player, bomb){
         }
         
         // ...existing code...
+    }
+
+    checkAndUnlockMobileButtons() {
+        try {
+            const savedUpgrades = localStorage.getItem('bombdrop-upgrades');
+            if (savedUpgrades) {
+                const upgrades = JSON.parse(savedUpgrades);
+                upgrades.forEach(upgrade => {
+                    if (upgrade.unlocked && window.unlockMobilePowerUp) {
+                        console.log('Unlocking mobile button for saved upgrade:', upgrade.name);
+                        window.unlockMobilePowerUp(upgrade.name);
+                    }
+                });
+            }
+        } catch (error) {
+            console.log('No saved upgrades found');
+        }
+        
+        // Also unlock based on current level
+        if (this.currentLevel >= 3 && window.unlockMobilePowerUp) {
+            window.unlockMobilePowerUp('fast fall');
+        }
+        if (this.currentLevel >= 4 && window.unlockMobilePowerUp) {
+            window.unlockMobilePowerUp('emp');
+        }
+        if (this.currentLevel >= 5 && window.unlockMobilePowerUp) {
+            window.unlockMobilePowerUp('barrier');
+        }
+        if (this.currentLevel >= 6 && window.unlockMobilePowerUp) {
+            window.unlockMobilePowerUp('sonic');
+        }
+    }
+
+    // Add this method to unlock mobile buttons when upgrades are purchased
+    unlockMobileAbility(abilityName) {
+        console.log('Game unlocking mobile ability:', abilityName);
+        
+        // Call the mobile unlock function
+        if (window.unlockMobilePowerUp) {
+            window.unlockMobilePowerUp(abilityName);
+        }
+        
+        // Save to localStorage so it persists
+        try {
+            let unlockedAbilities = JSON.parse(localStorage.getItem('mobile-unlocked') || '[]');
+            if (!unlockedAbilities.includes(abilityName)) {
+                unlockedAbilities.push(abilityName);
+                localStorage.setItem('mobile-unlocked', JSON.stringify(unlockedAbilities));
+            }
+        } catch (error) {
+            console.log('Failed to save mobile unlock:', error);
+        }
+    }
+
+    loadMobileUnlocks() {
+        try {
+            const unlockedAbilities = JSON.parse(localStorage.getItem('mobile-unlocked') || '[]');
+            unlockedAbilities.forEach(ability => {
+                if (window.unlockMobilePowerUp) {
+                    window.unlockMobilePowerUp(ability);
+                }
+            });
+            console.log('Loaded mobile unlocks:', unlockedAbilities);
+        } catch (error) {
+            console.log('No saved mobile unlocks found');
+        }
     }
 }

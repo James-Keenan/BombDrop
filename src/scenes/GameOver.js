@@ -4,6 +4,11 @@ export class GameOver extends Phaser.Scene {
     }
 
     create() {
+        // Hide mobile controller in GameOver scene
+        if (window.hideMobileController) {
+            window.hideMobileController();
+        }
+        
         // Set a dark background
         this.cameras.main.setBackgroundColor(0x2c1810);
 
@@ -22,7 +27,7 @@ export class GameOver extends Phaser.Scene {
         // Game Over title
         this.add.text(725, 220, 'Game Over', {
             fontFamily: 'Arial Black', 
-            fontSize: 64, 
+            fontSize: Math.floor(64 * textScale), 
             color: '#ff4444',
             stroke: '#000000', 
             strokeThickness: 8,
@@ -32,7 +37,7 @@ export class GameOver extends Phaser.Scene {
         // Level reached display
         this.add.text(725, 290, 'Level Reached: ' + finalLevel, {
             fontFamily: 'Arial', 
-            fontSize: 28, 
+            fontSize: Math.floor(28 * textScale), 
             color: '#00ff00',
             stroke: '#000000', 
             strokeThickness: 3,
@@ -42,7 +47,7 @@ export class GameOver extends Phaser.Scene {
         // Score display
         this.add.text(725, 330, 'Final Score: ' + finalScore, {
             fontFamily: 'Arial', 
-            fontSize: 32, 
+            fontSize: Math.floor(32 * textScale), 
             color: '#ffffff',
             stroke: '#000000', 
             strokeThickness: 4,
@@ -52,7 +57,7 @@ export class GameOver extends Phaser.Scene {
         // High score display
         this.add.text(725, 370, 'Personal Best: ' + highScore, {
             fontFamily: 'Arial', 
-            fontSize: 24, 
+            fontSize: Math.floor(24 * textScale), 
             color: '#ffff00',
             stroke: '#000000', 
             strokeThickness: 2,
@@ -62,7 +67,7 @@ export class GameOver extends Phaser.Scene {
         // Highest level display
         this.add.text(725, 405, 'Highest Level: ' + highestLevel, {
             fontFamily: 'Arial', 
-            fontSize: 24, 
+            fontSize: Math.floor(24 * textScale), 
             color: '#ff8800',
             stroke: '#000000', 
             strokeThickness: 2,
@@ -72,32 +77,9 @@ export class GameOver extends Phaser.Scene {
         // Instructions
         this.add.text(725, 470, 'Press SPACE to Return to Title Screen', {
             fontFamily: 'Arial', 
-            fontSize: 24, 
+            fontSize: Math.floor(24 * textScale), 
             color: '#ffffff',
             align: 'center'
-        }).setOrigin(0.5);
-
-        // Game Over text with mobile scaling
-        this.add.text(this.cameras.main.centerX, 200, 'Game Over!', {
-            fontSize: `${Math.floor(64 * textScale)}px`,
-            fontFamily: 'Arial, sans-serif',
-            color: '#ff0000',
-            stroke: '#000000',
-            strokeThickness: 4
-        }).setOrigin(0.5);
-        
-        // Score text with mobile scaling
-        this.add.text(this.cameras.main.centerX, 300, `Final Score: ${finalScore}`, {
-            fontSize: `${Math.floor(32 * textScale)}px`,
-            fontFamily: 'Arial, sans-serif',
-            color: '#ffffff'
-        }).setOrigin(0.5);
-        
-        // Instructions with mobile scaling
-        this.add.text(this.cameras.main.centerX, 400, 'Tap to continue', {
-            fontSize: `${Math.floor(24 * textScale)}px`,
-            fontFamily: 'Arial, sans-serif',
-            color: '#ffff00'
         }).setOrigin(0.5);
 
         // Input handling - only space key to return to main menu

@@ -111,6 +111,7 @@
                 border-top: 3px solid #4a5568;
                 padding: 10px 15px;
                 box-sizing: border-box;
+                flex-direction: column;
                 justify-content: space-between;
                 align-items: center;
                 position: relative;
@@ -118,71 +119,32 @@
                 flex-shrink: 0;
             }
             
-            /* Show controller only during gameplay */
-            .mobile-controller.game-active {
-                display: flex;
-            }
-            
             /* Force hide controller during upgrades */
             .mobile-controller.upgrade-mode {
                 display: none !important;
             }
             
-            /* Left side controls */
-            .controller-left {
+            /* Show controller only during gameplay */
+            .mobile-controller.game-active {
                 display: flex;
-                flex-direction: column;
-                align-items: center;
-                gap: 5px;
-                flex: 1;
             }
             
-            /* Movement buttons container */
-            .movement-controls {
-                display: grid;
-                grid-template-columns: 1fr 1fr 1fr;
-                grid-template-rows: 1fr 1fr;
-                gap: 3px;
-                width: 140px;
-                height: 90px;
-                position: relative;
-            }
-            
-            /* D-pad center piece */
-            .movement-controls::before {
-                content: '';
-                position: absolute;
-                top: 20px;
-                left: 45px;
-                width: 50px;
-                height: 50px;
-                background: linear-gradient(135deg, #2d3748, #1a202c);
-                border-radius: 6px;
-                z-index: 1;
-                box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.3);
-            }
-            
-            /* D-pad horizontal bar */
-            .movement-controls::after {
-                content: '';
-                position: absolute;
-                top: 32px;
-                left: 20px;
-                width: 100px;
-                height: 26px;
-                background: linear-gradient(135deg, #2d3748, #1a202c);
-                border-radius: 6px;
-                z-index: 1;
-                box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.3);
-            }
-            
-            /* Right side controls */
-            .controller-right {
+            /* Centered row for main movement buttons */
+            .controller-center-row {
                 display: flex;
-                flex-direction: column;
+                justify-content: center;
                 align-items: center;
-                gap: 5px;
-                flex: 1;
+                gap: 40px;
+                width: 100%;
+            }
+            
+            /* Bottom row for fast fall and power-ups */
+            .controller-bottom-row {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                width: 100%;
+                padding: 0 20px;
             }
             
             /* Action buttons container */
@@ -194,86 +156,45 @@
                 justify-content: center;
             }
             
-            /* Base button styling */
-            .control-btn {
-                border: none;
-                border-radius: 50%;
-                color: white;
-                font-weight: bold;
-                font-size: 18px;
-                cursor: pointer;
-                transition: all 0.2s ease;
-                box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
-                border: 3px solid rgba(255, 255, 255, 0.2);
-                font-family: Arial, sans-serif;
-                user-select: none;
-                -webkit-user-select: none;
-                touch-action: manipulation;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                text-align: center;
-                line-height: 1;
+            /* Jump button - smaller and centered with other buttons */
+            .jump-btn {
+                width: 60px;
+                height: 60px;
+                background: linear-gradient(135deg, #50c878, #3da55c);
+                font-size: 22px;
             }
             
-            /* Movement buttons - D-pad style */
+            /* Move buttons - consistent styling */
             .move-btn {
                 width: 50px;
                 height: 40px;
                 background: linear-gradient(135deg, #4a90e2, #357abd);
                 font-size: 18px;
                 border-radius: 6px;
-                z-index: 2;
-                position: relative;
                 border: 2px solid rgba(255, 255, 255, 0.3);
             }
             
-            /* Left button positioning */
-            #move-left {
-                grid-column: 1;
-                grid-row: 1;
-                border-radius: 6px 0 0 6px;
+            /* Fast fall button - disabled state */
+            .fast-fall-btn {
+                background: linear-gradient(135deg, #666, #555);
+                opacity: 0.5;
             }
             
-            /* Down button positioning */
-            #fast-fall {
-                grid-column: 2;
-                grid-row: 2;
-                width: 45px;
-                height: 40px;
-                border-radius: 0 0 6px 6px;
+            /* Fast fall button - enabled state */
+            .fast-fall-btn:not(:disabled) {
+                background: linear-gradient(135deg, #4a90e2, #357abd) !important;
+                opacity: 1 !important;
+                border: 2px solid rgba(255, 255, 255, 0.5) !important;
+                box-shadow: 0 0 8px rgba(74, 144, 226, 0.4) !important;
             }
             
-            /* Right button positioning */
-            #move-right {
-                grid-column: 3;
-                grid-row: 1;
-                border-radius: 0 6px 6px 0;
-            }
-            
-            /* Jump button - larger */
-            .jump-btn {
-                width: 80px;
-                height: 80px;
-                background: linear-gradient(135deg, #50c878, #3da55c);
-                font-size: 28px;
-            }
-            
-            /* Special ability buttons */
+            /* Add missing ability button styling */
             .ability-btn {
                 width: 50px;
                 height: 50px;
-                font-size: 14px;
-                position: relative;
-            }
-            
-            .fast-fall-btn {
-                background: linear-gradient(135deg, #ff6b6b, #e55353);
-            }
-            
-            /* Fast fall button - matches movement buttons when unlocked */
-            .fast-fall-btn:not(:disabled) {
-                background: linear-gradient(135deg, #4a90e2, #357abd);
+                font-size: 16px;
+                border-radius: 50%;
+                border: 2px solid rgba(255, 255, 255, 0.3);
             }
             
             .barrier-btn {
@@ -288,16 +209,29 @@
                 background: linear-gradient(135deg, #e74c3c, #c0392b);
             }
             
-            /* Button hover/active states */
-            .control-btn:active {
-                transform: scale(0.9);
-                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+            /* Button base styling */
+            .control-btn {
+                border: none;
+                color: white;
+                font-weight: bold;
+                cursor: pointer;
+                transition: all 0.2s ease;
+                box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+                font-family: Arial, sans-serif;
+                user-select: none;
+                -webkit-user-select: none;
+                touch-action: manipulation;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                text-align: center;
+                line-height: 1;
             }
             
             /* Disabled button styling */
             .control-btn:disabled {
                 opacity: 0.5;
-                background: linear-gradient(135deg, #666, #555);
+                background: linear-gradient(135deg, #666, #555) !important;
                 cursor: not-allowed;
             }
         }
@@ -372,24 +306,19 @@
     
     <!-- Mobile Controller - only visible on mobile devices -->
     <div class="mobile-controller">
-        <!-- Left Side - Movement Controls -->
-        <div class="controller-left">
-            <div class="movement-controls">
-                <button class="control-btn move-btn" id="move-left">←</button>
-                <button class="control-btn move-btn fast-fall-btn" id="fast-fall" disabled>
-                    ↓
-                </button>
-                <button class="control-btn move-btn" id="move-right">→</button>
-            </div>
+        <!-- Top Row - Main Movement Buttons -->
+        <div class="controller-center-row">
+            <button class="control-btn move-btn" id="move-left">←</button>
+            <button class="control-btn jump-btn" id="jump">↑</button>
+            <button class="control-btn move-btn" id="move-right">→</button>
         </div>
         
-        <!-- Right Side - Action Controls -->
-        <div class="controller-right">
-            <div class="action-controls">
-                <button class="control-btn jump-btn" id="jump">↑</button>
-            </div>
+        <!-- Bottom Row - Fast Fall and Power-ups -->
+        <div class="controller-bottom-row">
+            <button class="control-btn move-btn fast-fall-btn" id="fast-fall" disabled>
+                ↓
+            </button>
             
-            <!-- All power-ups below jump -->
             <div class="action-controls">
                 <button class="control-btn ability-btn barrier-btn" id="barrier" disabled>
                     🛡️
@@ -510,8 +439,8 @@
         window.addEventListener('DOMContentLoaded', function() {
             const controller = document.querySelector('.mobile-controller');
             if (controller) {
-                controller.classList.add('upgrade-mode');
-                console.log('Controller initially hidden');
+                // DON'T force upgrade-mode initially - let the game load normally
+                console.log('Controller ready - waiting for game to load');
             }
         });
         
@@ -520,8 +449,7 @@
                 console.log('Mobile device detected - setting up mobile layout');
                 document.body.classList.add('mobile-device');
                 
-                // Setup mobile controllers immediately
-                setupMobileControllers();
+                // DON'T setup mobile controllers immediately - wait for game
                 
                 // Prevent zoom on double tap
                 document.addEventListener('touchstart', function(event) {
@@ -588,153 +516,290 @@
             
             console.log('Setting up mobile controllers...');
             
-            const moveLeftBtn = document.getElementById('move-left');
-            const moveRightBtn = document.getElementById('move-right');
-            const jumpBtn = document.getElementById('jump');
-            const fastFallBtn = document.getElementById('fast-fall');
-            const barrierBtn = document.getElementById('barrier');
-            const empBtn = document.getElementById('emp');
-            const sonicBtn = document.getElementById('sonic');
+            // Setup each button with direct event handling (no cloning)
+            const buttonConfigs = [
+                { id: 'move-left', key: 37, name: 'Left', continuous: true },
+                { id: 'move-right', key: 39, name: 'Right', continuous: true },
+                { id: 'jump', key: 38, name: 'Jump', continuous: false },
+                { id: 'fast-fall', key: 40, name: 'Fast Fall', continuous: true },
+                { id: 'barrier', key: 87, name: 'Barrier', continuous: false }, // W key
+                { id: 'emp', key: 69, name: 'EMP', continuous: false }, // E key  
+                { id: 'sonic', key: 81, name: 'Sonic', continuous: false } // Q key
+            ];
             
-            if (!moveLeftBtn || !moveRightBtn || !jumpBtn) {
-                console.log('Mobile controller buttons not found');
-                return;
-            }
-            
-            // Remove existing event listeners to prevent duplicates
-            moveLeftBtn.replaceWith(moveLeftBtn.cloneNode(true));
-            moveRightBtn.replaceWith(moveRightBtn.cloneNode(true));
-            jumpBtn.replaceWith(jumpBtn.cloneNode(true));
-            fastFallBtn.replaceWith(fastFallBtn.cloneNode(true));
-            barrierBtn.replaceWith(barrierBtn.cloneNode(true));
-            empBtn.replaceWith(empBtn.cloneNode(true));
-            sonicBtn.replaceWith(sonicBtn.cloneNode(true));
-            
-            // Get fresh references after cloning
-            const newMoveLeftBtn = document.getElementById('move-left');
-            const newMoveRightBtn = document.getElementById('move-right');
-            const newJumpBtn = document.getElementById('jump');
-            const newFastFallBtn = document.getElementById('fast-fall');
-            const newBarrierBtn = document.getElementById('barrier');
-            const newEmpBtn = document.getElementById('emp');
-            const newSonicBtn = document.getElementById('sonic');
-            
-            // Create keyboard event simulator
-            function createKeyEvent(type, keyCode) {
-                return new KeyboardEvent(type, {
-                    keyCode: keyCode,
-                    which: keyCode,
-                    bubbles: true,
-                    cancelable: true
-                });
-            }
-            
-            // Setup movement buttons
-            function setupMovementButton(button, keyCode, direction) {
-                if (!button) return;
+            buttonConfigs.forEach(({ id, key, name, continuous }) => {
+                const button = document.getElementById(id);
+                if (!button) {
+                    console.log(`Button ${id} not found`);
+                    return;
+                }
+                
+                // Remove existing listeners without cloning
+                button.onclick = null;
+                button.ontouchstart = null;
+                button.ontouchend = null;
                 
                 let isPressed = false;
                 
-                const start = (e) => {
+                const handleStart = (e) => {
                     e.preventDefault();
-                    if (button.disabled || isPressed) return;
+                    
+                    // Simple check - if data-unlocked is true, always allow
+                    const isUnlocked = button.getAttribute('data-unlocked') === 'true';
+                    
+                    // Only check disabled state if NOT unlocked
+                    let isBlocked = false;
+                    if (!isUnlocked) {
+                        isBlocked = button.hasAttribute('disabled') || button.disabled === true;
+                    }
+                    
+                    console.log(`${name} button pressed:`, {
+                        isUnlocked: isUnlocked,
+                        isBlocked: isBlocked,
+                        disabled: button.disabled,
+                        hasDisabledAttr: button.hasAttribute('disabled')
+                    });
+                    
+                    if (isBlocked || isPressed) {
+                        console.log(`${name} blocked - isBlocked: ${isBlocked}, isPressed: ${isPressed}`);
+                        return;
+                    }
+                    
+                    console.log(`${name} ACTIVATED!`);
                     
                     isPressed = true;
                     button.style.transform = 'scale(0.9)';
-                    document.dispatchEvent(createKeyEvent('keydown', keyCode));
-                    console.log(`${direction} button pressed`);
+                    button.style.filter = 'brightness(1.2)';
+                    
+                    // Enhanced keyboard event dispatch with more properties
+                    const event = new KeyboardEvent('keydown', {
+                        keyCode: key,
+                        which: key,
+                        key: key === 69 ? 'e' : key === 81 ? 'q' : key === 87 ? 'w' : String.fromCharCode(key).toLowerCase(),
+                        code: key === 69 ? 'KeyE' : key === 81 ? 'KeyQ' : key === 87 ? 'KeyW' : `Key${String.fromCharCode(key)}`,
+                        bubbles: true,
+                        cancelable: true,
+                        composed: true
+                    });
+                    
+                    // Dispatch to both document and window for maximum compatibility
+                    document.dispatchEvent(event);
+                    window.dispatchEvent(event);
+                    console.log(`${name} keydown dispatched - keyCode: ${key}, key: ${event.key}, code: ${event.code}`);
+                    
+                    // For abilities, send keyup immediately
+                    if (!continuous) {
+                        setTimeout(() => {
+                            const upEvent = new KeyboardEvent('keyup', {
+                                keyCode: key,
+                                which: key,
+                                key: event.key,
+                                code: event.code,
+                                bubbles: true,
+                                cancelable: true,
+                                composed: true
+                            });
+                            document.dispatchEvent(upEvent);
+                            window.dispatchEvent(upEvent);
+                            console.log(`${name} keyup dispatched`);
+                        }, 100);
+                    }
                 };
                 
-                const end = (e) => {
-                    e.preventDefault();
+                const handleEnd = (e) => {
+                    if (e) e.preventDefault();
+                    
                     if (!isPressed) return;
                     
                     isPressed = false;
                     button.style.transform = 'scale(1)';
-                    document.dispatchEvent(createKeyEvent('keyup', keyCode));
-                    console.log(`${direction} button released`);
+                    button.style.filter = 'brightness(1)';
+                    
+                    // Send keyup for continuous actions
+                    if (continuous) {
+                        const upEvent = new KeyboardEvent('keyup', {
+                            keyCode: key,
+                            which: key,
+                            bubbles: true,
+                            cancelable: true
+                        });
+                        document.dispatchEvent(upEvent);
+                        console.log(`${name} keyup dispatched`);
+                    }
                 };
                 
-                button.addEventListener('touchstart', start, { passive: false });
-                button.addEventListener('touchend', end, { passive: false });
-                button.addEventListener('touchcancel', end, { passive: false });
-                button.addEventListener('mousedown', start);
-                button.addEventListener('mouseup', end);
-                button.addEventListener('mouseleave', end);
-            }
-            
-            // Setup action buttons (single press)
-            function setupActionButton(button, keyCode, actionName) {
-                if (!button) return;
+                // Add event listeners directly
+                button.addEventListener('touchstart', handleStart, { passive: false });
+                button.addEventListener('touchend', handleEnd, { passive: false });
+                button.addEventListener('mousedown', handleStart);
+                button.addEventListener('mouseup', handleEnd);
                 
-                const action = (e) => {
-                    e.preventDefault();
-                    if (button.disabled) return;
-                    
-                    button.style.transform = 'scale(0.9)';
-                    document.dispatchEvent(createKeyEvent('keydown', keyCode));
-                    
-                    setTimeout(() => {
-                        button.style.transform = 'scale(1)';
-                        document.dispatchEvent(createKeyEvent('keyup', keyCode));
-                    }, 100);
-                    
-                    console.log(`${actionName} activated`);
-                };
-                
-                button.addEventListener('touchstart', action, { passive: false });
-                button.addEventListener('mousedown', action);
-            }
-            
-            // Map buttons to keyboard keys
-            setupMovementButton(newMoveLeftBtn, 37, 'Left');     // Left arrow
-            setupMovementButton(newMoveRightBtn, 39, 'Right');   // Right arrow
-            setupActionButton(newJumpBtn, 38, 'Jump');           // Up arrow
-            setupActionButton(newFastFallBtn, 40, 'Fast Fall');  // Down arrow
-            setupActionButton(newBarrierBtn, 32, 'Barrier');     // Space
-            setupActionButton(newEmpBtn, 69, 'EMP');             // E key
-            setupActionButton(newSonicBtn, 81, 'Sonic');         // Q key
+                console.log(`${name} button setup complete`);
+            });
             
             console.log('Mobile controllers setup complete');
-            
-            // Update button states based on level
-            window.updateMobileButtons = function(gameLevel) {
-                console.log('Updating mobile buttons for level:', gameLevel);
-                
-                if (gameLevel >= 3 && newFastFallBtn) {
-                    newFastFallBtn.disabled = false;
-                    newFastFallBtn.style.opacity = '1';
-                }
-                
-                if (gameLevel >= 4 && newEmpBtn) {
-                    newEmpBtn.disabled = false;
-                    newEmpBtn.style.opacity = '1';
-                }
-                
-                if (gameLevel >= 5 && newBarrierBtn) {
-                    newBarrierBtn.disabled = false;
-                    newBarrierBtn.style.opacity = '1';
-                }
-                
-                if (gameLevel >= 6 && newSonicBtn) {
-                    newSonicBtn.disabled = false;
-                    newSonicBtn.style.opacity = '1';
-                }
-            };
         }
         
-        // Remove the auto-show controller for testing
-        // This was causing the controller to appear everywhere
-        /*
-        window.addEventListener('load', function() {
-            setTimeout(function() {
-                if (detectMobile()) {
-                    console.log('Auto-showing mobile controller for testing...');
-                    window.showMobileController();
+        // Enhanced unlock function that forces button state
+        window.unlockMobilePowerUp = function(powerUpName) {
+            console.log('UNLOCK CALLED:', powerUpName);
+            
+            if (!detectMobile()) {
+                console.log('Not mobile, skipping unlock');
+                return;
+            }
+            
+            const buttonMap = {
+                'fast fall': 'fast-fall',
+                'fastfall': 'fast-fall',
+                'double jump': 'fast-fall',
+                'down fall': 'fast-fall',
+                'emp': 'emp',
+                'emp blast': 'emp',
+                'barrier': 'barrier',
+                'shield': 'barrier',
+                'shield barrier': 'barrier',
+                'sonic': 'sonic',
+                'sonic boom': 'sonic'
+            };
+            
+            const buttonId = buttonMap[powerUpName.toLowerCase()];
+            const button = document.getElementById(buttonId);
+            
+            if (button) {
+                console.log('UNLOCKING BUTTON:', buttonId);
+                
+                // Force enable and style the button
+                button.disabled = false;
+                button.removeAttribute('disabled');
+                button.setAttribute('data-unlocked', 'true');
+                button.style.opacity = '1';
+                button.style.pointerEvents = 'auto';
+                button.style.cursor = 'pointer';
+                
+                // Apply specific styling based on button type
+                if (buttonId === 'fast-fall') {
+                    button.style.background = 'linear-gradient(135deg, #4a90e2, #357abd)';
+                    button.style.border = '2px solid rgba(255, 255, 255, 0.5)';
+                    button.style.boxShadow = '0 0 8px rgba(74, 144, 226, 0.4)';
+                    button.classList.remove('fast-fall-btn');
+                    button.classList.add('move-btn');
+                } else if (buttonId === 'emp') {
+                    button.style.background = 'linear-gradient(135deg, #f39c12, #e67e22)';
+                    button.style.border = '2px solid rgba(255, 255, 255, 0.5)';
+                } else if (buttonId === 'barrier') {
+                    button.style.background = 'linear-gradient(135deg, #9b59b6, #8e44ad)';
+                    button.style.border = '2px solid rgba(255, 255, 255, 0.5)';
+                } else if (buttonId === 'sonic') {
+                    button.style.background = 'linear-gradient(135deg, #e74c3c, #c0392b)';
+                    button.style.border = '2px solid rgba(255, 255, 255, 0.5)';
                 }
-            }, 3000);
-        });
-        */
+                
+                console.log(`${powerUpName} mobile button unlocked and styled!`);
+            } else {
+                console.log('Button NOT found:', buttonId);
+            }
+        };
+        
+        // Global function for the game to call when upgrades are unlocked
+        window.onUpgradePurchased = function(upgradeName) {
+            console.log('Upgrade purchased:', upgradeName);
+            
+            // Check if it's a mobile-relevant upgrade
+            const mobileMappings = {
+                'double jump': 'fast fall',
+                'fast fall': 'fast fall',
+                'down fall': 'fast fall',
+                'emp blast': 'emp',
+                'shield barrier': 'barrier',
+                'sonic boom': 'sonic'
+            };
+            
+            const mobileUpgrade = mobileMappings[upgradeName.toLowerCase()];
+            if (mobileUpgrade && window.unlockMobilePowerUp) {
+                console.log(`Unlocking mobile ${mobileUpgrade} for upgrade: ${upgradeName}`);
+                window.unlockMobilePowerUp(mobileUpgrade);
+            }
+        };
+        
+        // Simple test function that works immediately
+        window.testFastFall = function() {
+            console.log('Testing Fast Fall unlock...');
+            window.unlockMobilePowerUp('fast fall');
+            
+            // Verify it worked
+            const button = document.getElementById('fast-fall');
+            if (button) {
+                console.log('Fast Fall button state:', {
+                    disabled: button.disabled,
+                    dataUnlocked: button.getAttribute('data-unlocked'),
+                    background: button.style.background
+                });
+            }
+        };
+        
+        // Test function to manually unlock fast fall for testing
+        window.testUnlockFastFall = function() {
+            console.log('TEST: Unlocking fast fall');
+            const button = document.getElementById('fast-fall');
+            if (button) {
+                button.disabled = false;
+                button.style.opacity = '1';
+                button.style.background = 'linear-gradient(135deg, #4a90e2, #357abd)';
+                console.log('Fast fall button enabled for testing');
+            }
+        };
+        
+        // Test function that unlocks and re-setups controllers
+        window.testUnlockAll = function() {
+            console.log('Testing unlock all abilities');
+            window.unlockMobilePowerUp('fast fall');
+            
+            // Re-setup controllers after unlock to ensure proper event handling
+            setTimeout(() => {
+                setupMobileControllers();
+                console.log('Controllers re-setup after unlock');
+                
+                // Check final button state
+                const fastFallBtn = document.getElementById('fast-fall');
+                if (fastFallBtn) {
+                    console.log('Fast fall button final state:');
+                    console.log('- disabled:', fastFallBtn.disabled);
+                    console.log('- hasAttribute:', fastFallBtn.hasAttribute('disabled'));
+                    console.log('- data-unlocked:', fastFallBtn.getAttribute('data-unlocked'));
+                }
+            }, 200);
+            
+            window.unlockMobilePowerUp('emp');
+            window.unlockMobilePowerUp('barrier');
+            window.unlockMobilePowerUp('sonic');
+        };
+        
+        // Test function that forces Fast Fall unlock
+        window.forceUnlockFastFall = function() {
+            console.log('FORCE UNLOCKING Fast Fall...');
+            
+            const button = document.getElementById('fast-fall');
+            if (button) {
+                // Force enable completely
+                button.disabled = false;
+                button.removeAttribute('disabled');
+                button.setAttribute('data-unlocked', 'true');
+                button.style.opacity = '1';
+                button.style.pointerEvents = 'auto';
+                button.style.background = 'linear-gradient(135deg, #4a90e2, #357abd)';
+                button.style.border = '2px solid rgba(255, 255, 255, 0.5)';
+                button.style.boxShadow = '0 0 8px rgba(74, 144, 226, 0.4)';
+                button.classList.remove('fast-fall-btn');
+                button.classList.add('move-btn');
+                
+                console.log('Fast Fall button force unlocked:', {
+                    disabled: button.disabled,
+                    dataUnlocked: button.getAttribute('data-unlocked'),
+                    classList: button.className
+                });
+            }
+        };
         
         // Add mobile text scaling for Phaser
         window.getMobileTextScale = function() {
@@ -768,6 +833,101 @@
                 }
             }
             return textObject;
+        };
+        
+        // Test functions for all abilities
+        window.testUnlockSonic = function() {
+            console.log('Testing Sonic unlock...');
+            window.unlockMobilePowerUp('sonic');
+        };
+        
+        window.testUnlockBarrier = function() {
+            console.log('Testing Barrier unlock...');
+            window.unlockMobilePowerUp('barrier');
+        };
+        
+        window.testUnlockEMP = function() {
+            console.log('Testing EMP unlock...');
+            window.unlockMobilePowerUp('emp');
+        };
+        
+        // Test all abilities at once
+        window.testUnlockAllAbilities = function() {
+            console.log('Unlocking all mobile abilities...');
+            window.unlockMobilePowerUp('fast fall');
+            window.unlockMobilePowerUp('barrier');
+            window.unlockMobilePowerUp('emp');
+            window.unlockMobilePowerUp('sonic');
+        };
+        
+        // Test EMP specifically
+        window.testEMP = function() {
+            console.log('Testing EMP key dispatch...');
+            
+            // Test E key directly
+            const eKeyDown = new KeyboardEvent('keydown', {
+                keyCode: 69,
+                which: 69,
+                key: 'e',
+                code: 'KeyE',
+                bubbles: true,
+                cancelable: true
+            });
+            
+            const eKeyUp = new KeyboardEvent('keyup', {
+                keyCode: 69,
+                which: 69,
+                key: 'e',
+                code: 'KeyE',
+                bubbles: true,
+                cancelable: true
+            });
+            
+            document.dispatchEvent(eKeyDown);
+            console.log('E key down dispatched');
+            
+            setTimeout(() => {
+                document.dispatchEvent(eKeyUp);
+                console.log('E key up dispatched');
+            }, 100);
+        };
+        
+        // Test EMP with direct game interaction
+        window.testEMPDirect = function() {
+            console.log('Testing EMP directly...');
+            
+            // First unlock EMP
+            window.unlockMobilePowerUp('emp');
+            
+            // Wait a moment then test
+            setTimeout(() => {
+                // Try to trigger EMP through the game's input system
+                const empEvent = new KeyboardEvent('keydown', {
+                    keyCode: 69,
+                    which: 69,
+                    key: 'e',
+                    code: 'KeyE',
+                    bubbles: true,
+                    cancelable: true
+                });
+                
+                // Try multiple dispatch methods
+                document.body.dispatchEvent(empEvent);
+                document.dispatchEvent(empEvent);
+                window.dispatchEvent(empEvent);
+                
+                console.log('EMP event dispatched to multiple targets');
+                
+                // Check if there's a game scene and try to trigger EMP directly
+                const gameScene = window.game?.scene?.getScene('Game');
+                if (gameScene && gameScene.cursors && gameScene.cursors.emp) {
+                    console.log('Found game scene, triggering EMP directly');
+                    gameScene.cursors.emp.isDown = true;
+                    setTimeout(() => {
+                        gameScene.cursors.emp.isDown = false;
+                    }, 100);
+                }
+            }, 500);
         };
     </script>
     <script src="./phaser.js"></script>
