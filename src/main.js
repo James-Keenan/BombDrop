@@ -19,7 +19,18 @@ const config = {
     },
     scale: {
         mode: Phaser.Scale.FIT,
-        autoCenter: Phaser.Scale.CENTER_BOTH
+        autoCenter: Phaser.Scale.CENTER_BOTH,
+        min: {
+            width: 320,
+            height: 240
+        },
+        max: {
+            width: 1450,
+            height: 950
+        }
+    },
+    input: {
+        activePointers: 3 // Support multi-touch for mobile devices
     },
     scene: [
         Boot,

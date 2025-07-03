@@ -12,8 +12,21 @@ export class MainMenu extends Phaser.Scene {
     }
 
     create() {
+        // Mobile detection
+        this.isMobile = this.detectMobile();
+        
         this.showingRules = false;
         this.createDynamicMenu();
+   }
+    
+    // Mobile detection function (same as in Game.js)
+    detectMobile() {
+        const userAgent = navigator.userAgent || navigator.vendor || window.opera;
+        const isMobileDevice = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent);
+        const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+        const isSmallScreen = window.innerWidth <= 768 || window.innerHeight <= 768;
+        
+        return isMobileDevice || (isTouchDevice && isSmallScreen);
     }
 
     createDynamicMenu() {
@@ -442,8 +455,35 @@ export class MainMenu extends Phaser.Scene {
             ease: 'Sine.easeInOut'
         });
 
-        // Rules content with enhanced formatting
-        const rulesText = [
+        // Rules content with enhanced formatting (mobile-aware)
+        const rulesText = this.isMobile ? [
+            'MOBILE CONTROLS:',
+            '• Touch LEFT/RIGHT arrows to move',
+            '• Touch UP arrow to jump (double jump unlocks at level 2!)',
+            '• Touch DOWN arrow to drop faster (unlocks at level 3!)',
+            '• Touch B button for barrier (unlocks at level 5!)',
+            '• Touch E button for EMP, S button for Sonic Boom',
+            '',
+            'GAMEPLAY:',
+            '• Collect all stars to advance to the next level',
+            '• Avoid the bouncing bombs at all costs!',
+            '• More stars and bombs appear at higher levels',
+            '',
+            'PROGRESSION:',
+            '• Choose abilities when you level up!',
+            '• Level 2+: Double jump, Fast fall, etc.',
+            '• Level 3+: Flying stars appear!',
+            '• Level 4+: Triple jump becomes available',
+            '• Level 5+: Magnetic barrier becomes available',
+            '• Level 6+: Super speed becomes available',
+            '• Higher levels: Faster bombs, more stars',
+            '• Each star = 9 points',
+            '',
+            'LIVES:',
+            '• Extra life every 200+ points (cost increases)',
+            '• You get temporary invincibility after being hit',
+            '• Game over when all lives are lost'
+        ] : [
             'CONTROLS:',
             '• Use ARROW KEYS to move left and right',
             '• Press UP to jump (double jump unlocks at level 2!)',
