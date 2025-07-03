@@ -502,7 +502,7 @@ updateAbilityProperties() {
     
     // Update life regen properties based on rank
     if (this.abilityRanks.lifeRegen >= 1) {
-        this.lifeRegenPointsNeededForLife = 375 - ((this.abilityRanks.lifeRegen - 1) * 25); // Nerfed: Increases by 50, now 375, 350, 325, 300, 275
+        this.lifeRegenPointsNeededForLife = Math.max(250, 375 - ((this.abilityRanks.lifeRegen - 1) * 25)); // Ensure minimum of 250 points needed
     }
 }
 
@@ -654,10 +654,14 @@ getBarrierChargePercentage() {
     getLifeRegenProgress() {
         if (!this.lifeRegenUnlocked) return { current: 0, needed: 325, percentage: 0 };
         
+        // Ensure we have a valid needed value to prevent division by zero
+        const needed = Math.max(250, this.lifeRegenPointsNeededForLife);
+        const current = Math.max(0, this.lifeRegenPointsCollected);
+        
         return {
-            current: this.lifeRegenPointsCollected,
-            needed: this.lifeRegenPointsNeededForLife,
-            percentage: (this.lifeRegenPointsCollected / this.lifeRegenPointsNeededForLife) * 100
+            current: current,
+            needed: needed,
+            percentage: needed > 0 ? (current / needed) * 100 : 0
         };
     }
 
@@ -727,7 +731,11 @@ collectStar(starPoints = 9) {
         // Life regen system - regenerate lives based on star points
         if (this.lifeRegenUnlocked) {
             this.lifeRegenPointsCollected += starPoints;
-            if (this.lifeRegenPointsCollected >= this.lifeRegenPointsNeededForLife) {
+            
+            // Ensure we have a valid threshold to prevent infinite regeneration
+            const pointsNeeded = Math.max(250, this.lifeRegenPointsNeededForLife);
+            
+            if (this.lifeRegenPointsCollected >= pointsNeeded) {
                 // Grant a new life
                 if (this.gameScene && this.gameScene.lives !== undefined) {
                     this.gameScene.lives++;

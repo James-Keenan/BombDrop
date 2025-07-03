@@ -190,19 +190,30 @@ export class Game extends Phaser.Scene {
             this.sonicBoomKeyPressed = false;
         }
         
-        // Update barrier UI
-        this.updateBarrierUI();
+        // Throttle UI updates to prevent performance issues
+        // Only update UI every 10 frames (6 times per second instead of 60)
+        if (!this.uiUpdateCounter) {
+            this.uiUpdateCounter = 0;
+        }
+        this.uiUpdateCounter++;
         
-        // Update EMP UI
-        this.updateEMPUI();
+        if (this.uiUpdateCounter >= 10) {
+            // Update barrier UI
+            this.updateBarrierUI();
+            
+            // Update EMP UI
+            this.updateEMPUI();
+            
+            // Update Sonic Boom UI
+            this.updateSonicBoomUI();
+            
+            // Update Life Regen UI
+            this.updateLifeRegenUI();
+            
+            this.uiUpdateCounter = 0;
+        }
         
-        // Update Sonic Boom UI
-        this.updateSonicBoomUI();
-        
-        // Update Life Regen UI
-        this.updateLifeRegenUI();
-        
-        // Apply star magnet effect
+        // Apply star magnet effect (this needs to be called every frame for smooth movement)
         this.player.applyStarMagnet(this.stars);
 
     }
@@ -638,23 +649,23 @@ hitBomb (player, bomb){
 
     // Create Sonic Boom UI
     createSonicBoomUI() {
-        // Sonic Boom UI - positioned at the center bottom
-        this.sonicBoomLabel = this.add.text(725, 870, 'Sonic Boom:', { fontSize: '20px', fill: '#ff6600'}).setOrigin(0.5, 0);
+        // Sonic Boom UI - positioned at the center bottom (raised for better visibility)
+        this.sonicBoomLabel = this.add.text(725, 840, 'Sonic Boom:', { fontSize: '20px', fill: '#ff6600'}).setOrigin(0.5, 0);
         
         // Sonic Boom charge bar background
-        this.sonicBoomBarBg = this.add.rectangle(725, 900, 200, 20, 0x333333);
+        this.sonicBoomBarBg = this.add.rectangle(725, 870, 200, 20, 0x333333);
         this.sonicBoomBarBg.setOrigin(0.5, 0.5);
         this.sonicBoomBarBg.setStrokeStyle(2, 0xff6600);
         
         // Sonic Boom charge bar fill
-        this.sonicBoomBarFill = this.add.rectangle(725, 900, 196, 16, 0xff6600);
+        this.sonicBoomBarFill = this.add.rectangle(725, 870, 196, 16, 0xff6600);
         this.sonicBoomBarFill.setOrigin(0.5, 0.5);
         
         // Sonic Boom charges display
-        this.sonicBoomCharges = this.add.text(725, 920, 'Charges: 0', { fontSize: '16px', fill: '#ffaa00'}).setOrigin(0.5, 0);
+        this.sonicBoomCharges = this.add.text(725, 890, 'Charges: 0', { fontSize: '16px', fill: '#ffaa00'}).setOrigin(0.5, 0);
         
         // Sonic Boom instruction text
-        this.sonicBoomInstructionText = this.add.text(725, 940, 'Press Q to throw pulse grenade', { fontSize: '14px', fill: '#cccccc'}).setOrigin(0.5, 0);
+        this.sonicBoomInstructionText = this.add.text(725, 910, 'Press Q to throw pulse grenade', { fontSize: '14px', fill: '#cccccc'}).setOrigin(0.5, 0);
         
         // Hide UI initially (will be shown when unlocked)
         this.sonicBoomLabel.setVisible(false);
@@ -1434,23 +1445,36 @@ hitBomb (player, bomb){
             this.createLifeRegenUI();
         }
 
-        // Update progress bar
+        // Update progress bar only when values change
         if (this.lifeRegenBar) {
             const progress = this.player.getLifeRegenProgress();
-            const maxWidth = 156; // Adjusted for larger bar (160 - 4 for padding)
-            const currentWidth = Math.max(1, Math.min(maxWidth, maxWidth * (progress.current / progress.needed)));
             
-            this.lifeRegenBar.setSize(currentWidth, 12);
-            
-            // Change color and label when ready for extra life
-            if (progress.current >= progress.needed) {
-                this.lifeRegenBar.setFillStyle(0xffff00); // Yellow when ready
-                this.lifeRegenLabel.setText('READY!');
-                this.lifeRegenLabel.setColor('#ffff00');
-            } else {
-                this.lifeRegenBar.setFillStyle(0x00ff88); // Green for normal progress
-                this.lifeRegenLabel.setText(`LIFE REGEN (${progress.current}/${progress.needed})`);
-                this.lifeRegenLabel.setColor('#ffffff');
+            // Check if values have changed since last update
+            if (!this.lastLifeRegenProgress || 
+                this.lastLifeRegenProgress.current !== progress.current || 
+                this.lastLifeRegenProgress.needed !== progress.needed) {
+                
+                const maxWidth = 156; // Adjusted for larger bar (160 - 4 for padding)
+                const currentWidth = Math.max(1, Math.min(maxWidth, maxWidth * (progress.current / progress.needed)));
+                
+                this.lifeRegenBar.setSize(currentWidth, 12);
+                
+                // Change color and label when ready for extra life
+                if (progress.current >= progress.needed) {
+                    this.lifeRegenBar.setFillStyle(0xffff00); // Yellow when ready
+                    this.lifeRegenLabel.setText('READY!');
+                    this.lifeRegenLabel.setColor('#ffff00');
+                } else {
+                    this.lifeRegenBar.setFillStyle(0x00ff88); // Green for normal progress
+                    this.lifeRegenLabel.setText(`LIFE REGEN (${progress.current}/${progress.needed})`);
+                    this.lifeRegenLabel.setColor('#ffffff');
+                }
+                
+                // Store current values for next comparison
+                this.lastLifeRegenProgress = {
+                    current: progress.current,
+                    needed: progress.needed
+                };
             }
         }
     }
