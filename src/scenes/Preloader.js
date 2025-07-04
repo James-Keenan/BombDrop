@@ -24,39 +24,35 @@ export class Preloader extends Phaser.Scene {
     }
 
     preload() {
-    this.load.setPath('assets');
-    this.load.image('sky', "sky.png");
-    this.load.image('ground', "platform.png");
-    this.load.image('star', "star.png");
-    this.load.image('bomb', "bomb.png");
-    
-    // Load dude spritesheet (32x48)
-    this.load.spritesheet(
-        'dude',
-        "dude.png",
-        { frameWidth: 32, frameHeight: 48 }
-    );
-    
-    // Load cat and robot as regular images first for menu preview
-    this.load.image('cat-preview', "cat.png");
-    this.load.image('robot-preview', "robot.png");
-    this.load.image('dude-preview', "dude.png");
-    
-    // Try common spritesheet dimensions for cat and robot
-    // Cat and Robot dimensions: 4878 × 474 (542 × 474 per frame, 9 frames)
-    // Reduce frame width to avoid overlap with adjacent frames
-    
-    this.load.spritesheet(
-        'cat',
-        "cat.png",
-        { frameWidth: 540, frameHeight: 474 }
-    );
-    this.load.spritesheet(
-        'robot',
-        "robot.png",
-        { frameWidth: 560, frameHeight: 474 }
-    );
+        this.load.setPath('assets');
+        this.load.image('sky', "sky.png");
+        this.load.image('ground', "platform.png");
+        this.load.image('star', "star.png");
+        this.load.image('bomb', "bomb.png");
 
+        // Load dude spritesheet (32x48)
+        this.load.spritesheet(
+            'dude',
+            "dude.png",
+            { frameWidth: 32, frameHeight: 48 }
+        );
+
+        // Load cat and robot as regular images first for menu preview
+        this.load.image('cat-preview', "cat.png");
+        this.load.image('robot-preview', "robot.png");
+        this.load.image('dude-preview', "dude.png");
+
+        // Cat and Robot spritesheets
+        this.load.spritesheet(
+            'cat',
+            "cat.png",
+            { frameWidth: 540, frameHeight: 474 }
+        );
+        this.load.spritesheet(
+            'robot',
+            "robot.png",
+            { frameWidth: 560, frameHeight: 474 }
+        );
     }
 
     create() {

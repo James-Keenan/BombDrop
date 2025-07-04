@@ -2,9 +2,9 @@ export class MainMenu extends Phaser.Scene {
     constructor() {
         super('MainMenu');
         this.characters = [
-            { key: 'dude', label: 'Dude', previewKey: 'dude', previewFrame: 4, scale: 2.5 },
-            { key: 'cat', label: 'Cat', previewKey: 'cat', previewFrame: 4, scale: 0.25 },
-            { key: 'robot', label: 'Robot', previewKey: 'robot', previewFrame: 4, scale: 0.25 }
+            { key: 'dude', label: 'Turnup for what', previewKey: 'dude', previewFrame: 4, scale: 2.5 },
+            { key: 'cat', label: 'the great CATsby', previewKey: 'cat', previewFrame: 4, scale: 0.25 },
+            { key: 'Tekno', label: 'Tekno', previewKey: 'robot', previewFrame: 4, scale: 0.25 }
         ];
         this.selectedCharacterIndex = 0;
         this.dynamicElements = [];

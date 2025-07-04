@@ -296,6 +296,22 @@
             text-shadow: none !important;
             border: 2px solid rgba(150, 150, 150, 0.3) !important;
         }
+        /* Premium ability buttons - hidden by default, shown when unlocked */
+        .ability-btn.premium-locked {
+            display: none !important;
+        }
+        .ability-btn.premium-unavailable {
+            opacity: 0.3 !important;
+            pointer-events: none !important;
+            filter: grayscale(1) brightness(0.8);
+            display: inline-block !important;
+        }
+        .ability-btn.premium-ready {
+            opacity: 1 !important;
+            pointer-events: auto !important;
+            filter: none;
+            display: inline-block !important;
+        }
     </style>
 </head>
 <body>
@@ -958,6 +974,42 @@
                 }
             }, 500);
         };
+
+        // Utility: Set premium ability button state (locked, unavailable, ready)
+        function setPremiumAbilityButtonState(id, state) {
+            const btn = document.getElementById(id);
+            if (!btn) return;
+            if (state === 'locked') {
+                btn.disabled = true;
+                btn.classList.add('premium-locked');
+                btn.classList.remove('premium-ready', 'premium-unavailable');
+            } else if (state === 'unavailable') {
+                btn.disabled = true;
+                btn.classList.remove('premium-locked', 'premium-ready');
+                btn.classList.add('premium-unavailable');
+            } else if (state === 'ready') {
+                btn.disabled = false;
+                btn.classList.remove('premium-locked', 'premium-unavailable');
+                btn.classList.add('premium-ready');
+            }
+        }
+
+        // Update all premium ability buttons based on game state
+        window.updatePremiumAbilityButtons = function(state) {
+            // state: { barrier: 'locked'|'unavailable'|'ready', emp: ..., sonic: ..., zeroGravity: ... }
+            setPremiumAbilityButtonState('barrier', state.barrier);
+            setPremiumAbilityButtonState('emp', state.emp);
+            setPremiumAbilityButtonState('sonic', state.sonic);
+            setPremiumAbilityButtonState('zero-gravity', state.zeroGravity);
+        };
+
+        // Example: Call this from your game code after UI update
+        // window.updatePremiumAbilityButtons({
+        //   barrier: 'locked'|'unavailable'|'ready',
+        //   emp: 'locked'|'unavailable'|'ready',
+        //   sonic: 'locked'|'unavailable'|'ready',
+        //   zeroGravity: 'locked'|'unavailable'|'ready'
+        // });
     </script>
     <script src="./phaser.js"></script>
     <script type="module" src="./src/main.js"></script>
