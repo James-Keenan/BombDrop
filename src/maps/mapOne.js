@@ -1,11 +1,10 @@
 const mapOne = {
     backgroundKey: 'sky',
     platforms: [
-        { x: 900, y: 950, key: "ground", scaleX: 5.2, scaleY: 1 },
-        { x: 408, y: 399, key: "ground", scaleX: 0.4, scaleY: 0.3 },
+        { x: 900, y: 915, key: "ground", scaleX: 5.2, scaleY: 3 },
         { x: 1110, y: 185, key: "ground", scaleX: 1.2, scaleY: 0.3 },
         { x: -50, y: 150, key: "ground", scaleX: 1, scaleY: 0.3 },
-        { x: 700, y: 600, key: "ground", scaleX: 1, scaleY: 0.3 },
+        { x: 800, y: 600, key: "ground", scaleX: .8, scaleY: 0.3 },
         { x: 181, y: 825, key: "ground", scaleX: 1, scaleY: 5.3 }
         // Add more platforms as needed
     ],

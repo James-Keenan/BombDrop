@@ -410,9 +410,10 @@ getUpgradeCost(abilityName, currentRank) {
         extraLife: [] // Will be handled by default return
     };
     
-    // Special handling for extraLife - always costs 5 tokens
+    // Special handling for extraLife - cost increases by 1 token each time
     if (abilityName === 'extraLife') {
-        return { tokens: 5, specialTokens: 0 };
+        // Cost is 5 tokens for the first, then +1 for each additional purchase
+        return { tokens: 5 + (currentRank || 0), specialTokens: 0 };
     }
     
     return costs[abilityName][currentRank] || { tokens: 0, specialTokens: 0 };

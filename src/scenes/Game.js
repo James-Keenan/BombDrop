@@ -9,33 +9,56 @@ export class Game extends Phaser.Scene {
 
     create() {
         console.log('Game scene create() called');
-        
-        // Scale background to fit the new screen size (1450x950)
-        let bg = this.add.image(725, 475, 'sky');
+        // Get selected map from registry, fallback to default if not set
+        const selectedMap = this.registry.get('selectedMap');
+        // Use map background if available
+        let bgKey = 'sky';
+        if (selectedMap && selectedMap.backgroundKey) {
+            bgKey = selectedMap.backgroundKey;
+        }
+        let bg = this.add.image(725, 475, bgKey);
         bg.setScale(1450 / bg.width, 950 / bg.height);
 
         this.platforms = this.physics.add.staticGroup();
+        // All platforms and moving platforms are now loaded from the selected map only.
 
-        this.platforms.create(900, 950, "ground").setScale(5.2).refreshBody();
-
-        
-        // Create horizontally moving platform separately as kinematic body
-        this.movingPlatform = this.physics.add.sprite(408, 399, 'ground').setScale(.4, 0.3);
-        this.movingPlatform.body.setImmovable(true);
-        this.movingPlatform.body.setGravityY(0); // Disable gravity so it doesn't fall
-        this.movingPlatform.setVelocityX(80); // Initial horizontal velocity (moving right)
-        this.movingPlatform.moveDirection = 1; // 1 for right, -1 for left
-        this.movingPlatform.minX = 300; // Left boundary
-        this.movingPlatform.maxX = 700; // Right boundary
-        this.movingPlatform.originalX = 408; // Remember original position
-        this.platforms.create(1110, 185, 'ground').setScale(1.2, 0.3).refreshBody();
-        this.platforms.create(-50, 150, 'ground').setScale(1, 0.3).refreshBody(); //top left
-        this.platforms.create(700, 600, 'ground').setScale(1, 0.3).refreshBody();
-        this.platforms.create(181, 825, 'ground').setScale(1, 5.3).refreshBody();
 
         // Get selected character from registry, default to 'dude' if none selected
         const selectedCharacter = this.registry.get('selectedCharacter') || 'dude';
-        this.player = new Player(this, 100, 523, selectedCharacter);
+
+        // Get selected map from registry, fallback to default if not set
+        // const selectedMap = this.registry.get('selectedMap');
+
+        // If a map object is provided, use its platform data to build the level
+        if (selectedMap && selectedMap.platforms) {
+            // Remove default platforms
+            this.platforms.clear(true, true);
+            // Add platforms from selected map
+            selectedMap.platforms.forEach((plat) => {
+                const platform = this.platforms.create(plat.x, plat.y, plat.key || 'ground').setScale(plat.scaleX || 1, plat.scaleY || 1);
+                //
+                platform.refreshBody();
+            });
+            // Add moving platforms if present
+            if (selectedMap.movingPlatforms && selectedMap.movingPlatforms.length > 0) {
+                const mp = selectedMap.movingPlatforms[0]; // Only one for now
+                this.movingPlatform = this.physics.add.sprite(mp.x, mp.y, mp.key || 'ground').setScale(mp.scaleX || 1, mp.scaleY || 1);
+                this.movingPlatform.body.setImmovable(true);
+                this.movingPlatform.body.setGravityY(0);
+                this.movingPlatform.setVelocityX(mp.velocityX || 0);
+                this.movingPlatform.moveDirection = mp.moveDirection || 1;
+                this.movingPlatform.minX = mp.minX || mp.x - 100;
+                this.movingPlatform.maxX = mp.maxX || mp.x + 100;
+                this.movingPlatform.originalX = mp.x;
+            }
+        }
+
+        // Use player start from map if available
+        let playerStart = { x: 100, y: 523 };
+        if (selectedMap && selectedMap.playerStart) {
+            playerStart = selectedMap.playerStart;
+        }
+        this.player = new Player(this, playerStart.x, playerStart.y, selectedCharacter);
 
         // Set up platform collision with custom process function for platform drop
         this.physics.add.collider(this.player, this.platforms, null, this.platformCollisionProcess, this);
@@ -874,15 +897,15 @@ hitBomb (player, bomb){
         }).setOrigin(0.5);
         
         // Section headers
-        let regularHeader = this.add.text(450, 250, 'REGULAR UPGRADES', {
+        let regularHeader = this.add.text(400, 210, 'REGULAR UPGRADES', {
             fontFamily: 'Arial Black',
             fontSize: 28,
             color: '#ffff00',
             stroke: '#000000',
             strokeThickness: 3
         }).setOrigin(0.5);
-        
-        let premiumHeader = this.add.text(1000, 250, '★ PREMIUM UPGRADES ★', {
+
+        let premiumHeader = this.add.text(1000, 210, '★ PREMIUM UPGRADES ★', {
             fontFamily: 'Arial Black',
             fontSize: 28,
             color: '#ff00ff',
@@ -913,26 +936,28 @@ hitBomb (player, bomb){
     createUpgradeCards() {
         console.log('createUpgradeCards called');
         
+        // Spread out upgrades more (wider grid)
         const regularUpgrades = [
-            { name: 'jump', title: this.player.getJumpUpgradeName(), icon: '⬆', x: 200, y: 350 },
-            { name: 'speed', title: this.player.getSpeedUpgradeName(), icon: '»', x: 350, y: 350 },
-            { name: 'fastFall', title: 'Fast Fall', icon: '⬇', x: 500, y: 350 },
-            { name: 'slowBombs', title: this.player.getSlowBombsUpgradeName(), icon: '🐌', x: 200, y: 500 },
-            { name: 'starMultiplier', title: this.player.getStarMultiplierUpgradeName(), icon: '⭐', x: 200, y: 650 },
-            { name: 'starMagnet', title: this.player.getStarMagnetUpgradeName(), icon: '🧲', x: 350, y: 500 },
-            { name: 'lifeRegen', title: this.player.getLifeRegenUpgradeName(), icon: '♥', x: 500, y: 500 },
-            { name: 'extraLife', title: this.player.getExtraLifeUpgradeName(), icon: '💖', x: 350, y: 650 }
+            { name: 'jump', title: this.player.getJumpUpgradeName(), icon: '⬆', x: 180, y: 340 },
+            { name: 'speed', title: this.player.getSpeedUpgradeName(), icon: '»', x: 390, y: 340 },
+            { name: 'fastFall', title: 'Fast Fall', icon: '⬇', x: 600, y: 340 },
+            { name: 'slowBombs', title: this.player.getSlowBombsUpgradeName(), icon: '🐌', x: 180, y: 540 },
+            { name: 'starMultiplier', title: this.player.getStarMultiplierUpgradeName(), icon: '⭐', x: 180, y: 740 },
+            { name: 'starMagnet', title: this.player.getStarMagnetUpgradeName(), icon: '🧲', x: 390, y: 540 },
+            { name: 'lifeRegen', title: this.player.getLifeRegenUpgradeName(), icon: '♥', x: 600, y: 540 },
+            { name: 'extraLife', title: this.player.getExtraLifeUpgradeName(), icon: '💖', x: 390, y: 740 }
         ];
         
         console.log('Regular upgrades defined:', regularUpgrades);
         
+        // Premium upgrades: make boxes touch like regular upgrades (spacing 210px apart, same as regular)
         const premiumUpgrades = [
-            { name: 'barrier', title: this.player.getBarrierUpgradeName(), icon: '⦿', x: 850, y: 350 },
-            { name: 'emp', title: 'EMP', icon: '⚡', x: 1000, y: 350 },
-            { name: 'sonicBoom', title: this.player.getSonicBoomUpgradeName(), icon: '💥', x: 1150, y: 350 },
-            { name: 'platformDrop', title: this.player.getPlatformDropUpgradeName(), icon: '↕', x: 850, y: 500 },
-            { name: 'tokenBonus', title: this.player.getTokenBonusUpgradeName(), icon: '💰', x: 1000, y: 500 },
-            { name: 'zeroGravity', title: this.getZeroGravityUpgradeName(), icon: '🌌', x: 1150, y: 500 }
+            { name: 'barrier', title: this.player.getBarrierUpgradeName(), icon: '⦿', x: 820, y: 340 },
+            { name: 'emp', title: 'EMP', icon: '⚡', x: 1030, y: 340 },
+            { name: 'sonicBoom', title: this.player.getSonicBoomUpgradeName(), icon: '💥', x: 1240, y: 340 },
+            { name: 'platformDrop', title: this.player.getPlatformDropUpgradeName(), icon: '↕', x: 820, y: 540 },
+            { name: 'tokenBonus', title: this.player.getTokenBonusUpgradeName(), icon: '💰', x: 1030, y: 540 },
+            { name: 'zeroGravity', title: this.getZeroGravityUpgradeName(), icon: '🌌', x: 1240, y: 540 }
         ];
         
         console.log('Premium upgrades defined:', premiumUpgrades);
@@ -987,45 +1012,47 @@ hitBomb (player, bomb){
             cost = this.player.getUpgradeCost(upgrade.name, currentRank);
         }
         
-        // Card background
-        const cardWidth = 120;
-        const cardHeight = 120;
+
+        // Card background (bigger to fit text)
+        const cardWidth = 200;
+        const cardHeight = 200;
         let card = this.add.rectangle(upgrade.x, upgrade.y, cardWidth, cardHeight, canUpgrade ? 0x004488 : 0x333333, 1);
-        card.setStrokeStyle(3, isPremium ? 0xff00ff : 0x00ffff);
-        
+        card.setStrokeStyle(4, isPremium ? 0xff00ff : 0x00ffff);
+
         // Make card interactive for all cards (for tooltips)
         card.setInteractive();
-        
-        // Icon
-        let icon = this.add.text(upgrade.x, upgrade.y - 30, upgrade.icon, {
+
+        // Icon (smaller)
+        let icon = this.add.text(upgrade.x, upgrade.y - 48, upgrade.icon, {
             fontFamily: 'Arial Black',
             fontSize: 28,
             color: '#ffffff'
         }).setOrigin(0.5);
-        
-        // Title
-        let title = this.add.text(upgrade.x, upgrade.y - 5, upgrade.title, {
+
+        // Title (smaller, but more space)
+        let title = this.add.text(upgrade.x, upgrade.y + 5, upgrade.title, {
             fontFamily: 'Arial Black',
-            fontSize: 12,
-            color: '#ffffff'
+            fontSize: 22,
+            color: '#ffffff',
+            wordWrap: { width: cardWidth - 30 }
         }).setOrigin(0.5);
-        
+
         // Rank display (hide for extraLife)
         let rankText = '';
         let rank = null;
-        
+
         if (upgrade.name !== 'extraLife') {
             rankText = `${currentRank}/${maxRank}`;
             if (currentRank >= maxRank) rankText = 'MAX';
-            
-            rank = this.add.text(upgrade.x, upgrade.y + 15, rankText, {
+
+            rank = this.add.text(upgrade.x, upgrade.y + 60, rankText, {
                 fontFamily: 'Arial Black',
-                fontSize: 10,
+                fontSize: 16,
                 color: currentRank >= maxRank ? '#00ff00' : '#ffffff'
             }).setOrigin(0.5);
         }
-        
-        // Cost display
+
+        // Cost display (smaller)
         let costText = '';
         if (currentRank >= maxRank) {
             costText = 'MAXED';
@@ -1042,28 +1069,28 @@ hitBomb (player, bomb){
                 costText = `${cost.tokens}T`;
             }
         }
-        
+
         let costColor = '#cccccc';
         if (currentRank >= maxRank) costColor = '#00ff00';
         else if (canUpgrade) costColor = isPremium ? '#ff00ff' : '#ffff00';
         else costColor = '#ff4444';
-        
-        let costDisplay = this.add.text(upgrade.x, upgrade.y + 35, costText, {
+
+        let costDisplay = this.add.text(upgrade.x, upgrade.y + 85, costText, {
             fontFamily: 'Arial',
-            fontSize: 10,
+            fontSize: 16,
             color: costColor
         }).setOrigin(0.5);
-        
-        // Premium star indicator
+
+        // Premium star indicator (smaller)
         if (isPremium) {
-            let star = this.add.text(upgrade.x + 45, upgrade.y - 45, '★', {
+            let star = this.add.text(upgrade.x + 80, upgrade.y - 80, '★', {
                 fontFamily: 'Arial Black',
-                fontSize: 16,
+                fontSize: 20,
                 color: '#ff00ff'
             }).setOrigin(0.5);
             this.upgradeMenuElements.push(star);
         }
-        
+
         // Store elements
         let elementsToStore = [card, icon, title, costDisplay];
         if (rank) elementsToStore.push(rank);
@@ -1589,12 +1616,12 @@ hitBomb (player, bomb){
     createTooltip(x, y, title, description) {
         this.hideTooltip();
         
-        const tooltipWidth = 320;
-        const tooltipHeight = 120;
-        
+        const tooltipWidth = 600;
+        const tooltipHeight = 220;
+
         let adjustedX = x;
         let adjustedY = y - tooltipHeight - 10;
-        
+
         if (adjustedX + tooltipWidth > 1450) {
             adjustedX = 1450 - tooltipWidth - 10;
         }
@@ -1602,29 +1629,29 @@ hitBomb (player, bomb){
             adjustedX = 10;
         }
         if (adjustedY < 10) {
-            adjustedY = y + 70;
+            adjustedY = y + 120;
         }
-        
-        this.tooltip = this.add.rectangle(adjustedX + tooltipWidth/2, adjustedY + tooltipHeight/2, tooltipWidth, tooltipHeight, 0x000000, 0.95);
-        this.tooltip.setStrokeStyle(3, 0xffffff);
+
+        this.tooltip = this.add.rectangle(adjustedX + tooltipWidth/2, adjustedY + tooltipHeight/2, tooltipWidth, tooltipHeight, 0x000000, 0.97);
+        this.tooltip.setStrokeStyle(5, 0xffffff);
         this.tooltip.setDepth(1000);
-        
-        this.tooltipTitle = this.add.text(adjustedX + 15, adjustedY + 15, title, {
+
+        this.tooltipTitle = this.add.text(adjustedX + 30, adjustedY + 30, title, {
             fontFamily: 'Arial Black',
-            fontSize: 16,
+            fontSize: 38,
             color: '#ffff00',
-            wordWrap: { width: tooltipWidth - 30 }
+            wordWrap: { width: tooltipWidth - 60 }
         });
         this.tooltipTitle.setDepth(1001);
-        
-        this.tooltipDescription = this.add.text(adjustedX + 15, adjustedY + 40, description, {
+
+        this.tooltipDescription = this.add.text(adjustedX + 30, adjustedY + 90, description, {
             fontFamily: 'Arial',
-            fontSize: 13,
+            fontSize: 28,
             color: '#ffffff',
-            wordWrap: { width: tooltipWidth - 30 }
+            wordWrap: { width: tooltipWidth - 60 }
         });
         this.tooltipDescription.setDepth(1001);
-        
+
         this.tooltipElements = [this.tooltip, this.tooltipTitle, this.tooltipDescription];
     }
     
