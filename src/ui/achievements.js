@@ -1,0 +1,310 @@
+// achievements.js
+// UI overlay for achievements in BombDrop
+// Exports a function to show the achievements UI and handle progress display
+
+// Difficulty levels
+const DIFFICULTY_LEVELS = [
+    { key: 'rookie', label: 'Rookie', color: '#66ff99' },
+    { key: 'normal', label: 'Normal', color: '#ffe066' },
+    { key: 'gifted', label: 'Gifted', color: '#66aaff' },
+    { key: 'expert', label: 'Expert', color: '#ff8844' },
+    { key: 'master', label: 'Master', color: '#ff4466' }
+];
+
+// Base achievements (all will be expanded to 3 tiers)
+const BASE_ACHIEVEMENTS = [
+    // Rookie (20)
+    { key: 'stars', baseName: 'Star Collector', baseDesc: 'Collect stars.', type: 'stars', goals: [100, 500, 2000], difficulties: ['rookie', 'normal', 'gifted'] },
+    { key: 'bombs_avoided', baseName: 'Bomb Dodger', baseDesc: 'Survive bombs.', type: 'bombs_avoided', goals: [10, 100, 250], difficulties: ['rookie', 'normal', 'gifted'] },
+    { key: 'level', baseName: 'Level Up', baseDesc: 'Reach levels.', type: 'level', goals: [1, 10, 25], difficulties: ['rookie', 'normal', 'gifted'] },
+    { key: 'deaths', baseName: 'Fallen', baseDesc: 'Lose lives.', type: 'deaths', goals: [10, 50, 100], difficulties: ['rookie', 'normal', 'gifted'] },
+    { key: 'wins', baseName: 'Victor', baseDesc: 'Win games.', type: 'wins', goals: [1, 5, 10], difficulties: ['rookie', 'normal', 'gifted'] },
+    { key: 'upgrades', baseName: 'Upgrade Buyer', baseDesc: 'Buy upgrades.', type: 'upgrades', goals: [5, 10, 20], difficulties: ['rookie', 'normal', 'gifted'] },
+    { key: 'tokens', baseName: 'Token Collector', baseDesc: 'Collect tokens.', type: 'tokens', goals: [10, 50, 100], difficulties: ['rookie', 'normal', 'gifted'] },
+    { key: 'barrier', baseName: 'Barrier User', baseDesc: 'Use Barrier.', type: 'barrier', goals: [5, 10, 25], difficulties: ['rookie', 'normal', 'gifted'] },
+    { key: 'emp', baseName: 'EMP User', baseDesc: 'Use EMP.', type: 'emp', goals: [5, 10, 25], difficulties: ['rookie', 'normal', 'gifted'] },
+    { key: 'sonic', baseName: 'Sonic Boomer', baseDesc: 'Use Sonic Boom.', type: 'sonic', goals: [5, 10, 25], difficulties: ['rookie', 'normal', 'gifted'] },
+    { key: 'platformDrop', baseName: 'Platform Dropper', baseDesc: 'Drop through platforms.', type: 'platformDrop', goals: [10, 50, 100], difficulties: ['rookie', 'normal', 'gifted'] },
+    { key: 'zeroGravity', baseName: 'Zero Gravity', baseDesc: 'Use Zero Gravity.', type: 'zeroGravity', goals: [10, 20, 50], difficulties: ['rookie', 'normal', 'gifted'] },
+    { key: 'catsbyUnlocked', baseName: 'Unlock CATsby', baseDesc: 'Unlock CATsby as a playable character.', type: 'catsbyUnlocked', goals: [1], difficulties: ['rookie', 'normal', 'gifted'] },
+    { key: 'robotUnlocked', baseName: 'Unlock Tekno', baseDesc: 'Unlock Tekno as a playable character.', type: 'robotUnlocked', goals: [1], difficulties: ['rookie', 'normal', 'gifted'] },
+    // Play as each character (rookie tier)
+    { key: 'dudePlayed', baseName: 'Play as Dude', baseDesc: 'Play a game as Dude.', type: 'dudePlayed', goals: [1, 5, 15], difficulties: ['rookie', 'normal', 'gifted'] },
+    { key: 'catPlayed', baseName: 'Play as CATsby', baseDesc: 'Play a game as CATsby.', type: 'catPlayed', goals: [1, 5, 15], difficulties: ['rookie', 'normal', 'gifted'] },
+    { key: 'robotPlayed', baseName: 'Play as Tekno', baseDesc: 'Play a game as Tekno.', type: 'robotPlayed', goals: [1, 5, 15], difficulties: ['rookie', 'normal', 'gifted'] },
+    { key: 'gabbiePlayed', baseName: 'Play as Gabbie', baseDesc: 'Play a game as Gabbie.', type: 'gabbiePlayed', goals: [1, 5, 15], difficulties: ['rookie', 'normal', 'gifted'] },
+    { key: 'plutoPlayed', baseName: 'Play as Pluto', baseDesc: 'Play a game as Pluto.', type: 'plutoPlayed', goals: [1, 5, 15], difficulties: ['rookie', 'normal', 'gifted'] },
+    { key: 'petePlayed', baseName: 'Play as Pete', baseDesc: 'Play a game as Pete.', type: 'petePlayed', goals: [1, 5, 15], difficulties: ['rookie', 'normal', 'gifted'] },
+    // Win as each character (normal tier)
+    { key: 'dudeWin', baseName: 'Dude Winner', baseDesc: 'Win as Dude.', type: 'dudeWin', goals: [1, 3, 7], difficulties: ['normal', 'gifted', 'expert'] },
+    { key: 'catWin', baseName: 'CATsby Winner', baseDesc: 'Win as CATsby.', type: 'catWin', goals: [1, 3, 7], difficulties: ['normal', 'gifted', 'expert'] },
+    { key: 'robotWin', baseName: 'Tekno Winner', baseDesc: 'Win as Tekno.', type: 'robotWin', goals: [1, 3, 7], difficulties: ['normal', 'gifted', 'expert'] },
+    { key: 'gabbieWin', baseName: 'Gabbie Winner', baseDesc: 'Win as Gabbie.', type: 'gabbieWin', goals: [1, 3, 7], difficulties: ['normal', 'gifted', 'expert'] },
+    { key: 'plutoWin', baseName: 'Pluto Winner', baseDesc: 'Win as Pluto.', type: 'plutoWin', goals: [1, 3, 7], difficulties: ['normal', 'gifted', 'expert'] },
+    { key: 'peteWin', baseName: 'Pete Winner', baseDesc: 'Win as Pete.', type: 'peteWin', goals: [1, 3, 7], difficulties: ['normal', 'gifted', 'expert'] },
+    // Play on each map (rookie tier)
+    { key: 'mapOnePlayed', baseName: "Turnup's Trail", baseDesc: 'Play on Turnup\'s Trail.', type: 'mapOnePlayed', goals: [1, 5, 15], difficulties: ['rookie', 'normal', 'gifted'] },
+    { key: 'catsbyCornerPlayed', baseName: "Catsby's Corner", baseDesc: 'Play on Catsby\'s Corner.', type: 'catsbyCornerPlayed', goals: [1, 5, 15], difficulties: ['rookie', 'normal', 'gifted'] },
+    { key: 'robotMapPlayed', baseName: "Tekno's Terminal", baseDesc: 'Play on Tekno\'s Terminal.', type: 'robotMapPlayed', goals: [1, 5, 15], difficulties: ['rookie', 'normal', 'gifted'] },
+    { key: 'gabbiesGravePlayed', baseName: "Gabbie's Grave", baseDesc: 'Play on Gabbie\'s Grave.', type: 'gabbiesGravePlayed', goals: [1, 5, 15], difficulties: ['rookie', 'normal', 'gifted'] },
+    { key: 'peteStreetPlayed', baseName: "Pete's Street", baseDesc: 'Play on Pete\'s Street.', type: 'peteStreetPlayed', goals: [1, 5, 15], difficulties: ['rookie', 'normal', 'gifted'] },
+    // Win on each map (normal tier)
+    { key: 'mapOneWin', baseName: "Turnup's Trail Winner", baseDesc: 'Win on Turnup\'s Trail.', type: 'mapOneWin', goals: [1], difficulties: ['normal', 'gifted', 'expert'] },
+    { key: 'catsbyCornerWin', baseName: "Catsby's Corner Winner", baseDesc: 'Win on Catsby\'s Corner.', type: 'catsbyCornerWin', goals: [1], difficulties: ['normal', 'gifted', 'expert'] },
+    { key: 'robotMapWin', baseName: "Tekno's Terminal Winner", baseDesc: 'Win on Tekno\'s Terminal.', type: 'robotMapWin', goals: [1], difficulties: ['normal', 'gifted', 'expert'] },
+    { key: 'gabbiesGraveWin', baseName: "Gabbie's Grave Winner", baseDesc: 'Win on Gabbie\'s Grave.', type: 'gabbiesGraveWin', goals: [1], difficulties: ['normal', 'gifted', 'expert'] },
+    { key: 'peteStreetWin', baseName: "Pete's Street Winner", baseDesc: 'Win on Pete\'s Street.', type: 'peteStreetWin', goals: [1], difficulties: ['normal', 'gifted', 'expert'] },
+    { key: 'jump_100', baseName: 'Jumper', baseDesc: 'Jump times.', type: 'jumps', goals: [10, 50, 100], difficulties: ['rookie', 'normal', 'gifted'] },
+    { key: 'settings_1', baseName: 'Tinkerer', baseDesc: 'Change a setting.', type: 'settingsChanged', goals: [1], difficulties: ['rookie', 'normal', 'gifted'] },
+    { key: 'menu_1', baseName: 'Menu Explorer', baseDesc: 'Open the main menu.', type: 'menuOpened', goals: [1, 3, 5], difficulties: ['rookie', 'normal', 'gifted'] },
+
+    // Normal (20)
+    { key: 'star_50', baseName: 'Star Gatherer', baseDesc: 'Collect stars in one game.', type: 'starsSingle', goals: [10, 25, 50], difficulties: ['normal', 'gifted', 'expert'] },
+    { key: 'bomb_20', baseName: 'Bomb Handler', baseDesc: 'Survive bombs in one game.', type: 'bombsSingle', goals: [5, 10, 20], difficulties: ['normal', 'gifted', 'expert'] },
+    { key: 'deathless_1', baseName: 'No Death', baseDesc: 'Complete a game without dying.', type: 'deathless', goals: [1, 3, 5], difficulties: ['normal', 'gifted', 'expert'] },
+    { key: 'token_200', baseName: 'Token Hoarder', baseDesc: 'Collect tokens in one game.', type: 'tokensSingle', goals: [20, 50, 100], difficulties: ['normal', 'gifted', 'expert'] },
+    { key: 'upgrade_20', baseName: 'Upgrade Fanatic', baseDesc: 'Buy upgrades in one game.', type: 'upgradesSingle', goals: [2, 5, 10], difficulties: ['normal', 'gifted', 'expert'] },
+    { key: 'barrier_uses', baseName: 'Barrier Master', baseDesc: 'Use Barrier in one game.', type: 'barrierSingle', goals: [2, 5, 10], difficulties: ['normal', 'gifted', 'expert'] },
+    { key: 'emp_uses', baseName: 'EMP Master', baseDesc: 'Use EMP in one game.', type: 'empSingle', goals: [2, 5, 10], difficulties: ['normal', 'gifted', 'expert'] },
+    { key: 'sonic_uses', baseName: 'Sonic Master', baseDesc: 'Use Sonic Boom in one game.', type: 'sonicSingle', goals: [2, 5, 10], difficulties: ['normal', 'gifted', 'expert'] },
+    { key: 'platform_uses', baseName: 'Platform Master', baseDesc: 'Drop through platforms in one game.', type: 'platformDropSingle', goals: [2, 5, 10], difficulties: ['normal', 'gifted', 'expert'] },
+    { key: 'zero_uses', baseName: 'Zero Gravity Master', baseDesc: 'Use Zero Gravity in one game.', type: 'zeroGravitySingle', goals: [2, 5, 10], difficulties: ['normal', 'gifted', 'expert'] },
+    { key: 'cat_play', baseName: 'CATsby Main', baseDesc: 'Play as CATsby.', type: 'catPlayed', goals: [1, 5, 15], difficulties: ['normal', 'gifted', 'expert'] },
+    { key: 'robot_play', baseName: 'Tekno Main', baseDesc: 'Play as Tekno.', type: 'robotPlayed', goals: [1, 5, 15], difficulties: ['normal', 'gifted', 'expert'] },
+    // Gabbie (formerly Zara) win achievement
+    { key: 'gabbieWin', baseName: 'Gabbie Winner', baseDesc: 'Win as Gabbie.', type: 'gabbieWin', goals: [1, 3, 7], difficulties: ['normal', 'gifted', 'expert'] },
+    { key: 'cat_win', baseName: 'CATsby Winner', baseDesc: 'Win as CATsby.', type: 'catWins', goals: [1, 3, 7], difficulties: ['normal', 'gifted', 'expert'] },
+    { key: 'robot_win', baseName: 'Tekno Winner', baseDesc: 'Win as Tekno.', type: 'robotWins', goals: [1, 3, 7], difficulties: ['normal', 'gifted', 'expert'] },
+    { key: 'multi_play', baseName: 'Multiplayer', baseDesc: 'Play a multiplayer game.', type: 'multiplayer', goals: [1, 5, 10], difficulties: ['normal', 'gifted', 'expert'] },
+    { key: 'coop_play', baseName: 'Co-op', baseDesc: 'Play a co-op game.', type: 'coop', goals: [1, 5, 10], difficulties: ['normal', 'gifted', 'expert'] },
+    { key: 'map_explore', baseName: 'Explorer', baseDesc: 'Play on every map.', type: 'mapsExplored', goals: [2, 4, 6], difficulties: ['normal', 'gifted', 'expert'] },
+    { key: 'settings_reset', baseName: 'Resetter', baseDesc: 'Reset your settings.', type: 'settingsReset', goals: [1, 2, 3], difficulties: ['normal', 'gifted', 'expert'] },
+    { key: 'menu_return', baseName: 'Menu Returner', baseDesc: 'Return to menu after a game.', type: 'menuReturn', goals: [1, 3, 5], difficulties: ['normal', 'gifted', 'expert'] },
+
+    // Gifted (20)
+    { key: 'star_200', baseName: 'Star Hoarder', baseDesc: 'Collect stars in total.', type: 'starsTotal', goals: [50, 100, 200], difficulties: ['gifted', 'expert', 'master'] },
+    { key: 'bomb_50', baseName: 'Bomb Veteran', baseDesc: 'Survive bombs in total.', type: 'bombsTotal', goals: [20, 35, 50], difficulties: ['gifted', 'expert', 'master'] },
+    { key: 'death_50', baseName: 'Fallen Veteran', baseDesc: 'Lose lives in total.', type: 'deathsTotal', goals: [20, 35, 50], difficulties: ['gifted', 'expert', 'master'] },
+    { key: 'win_50', baseName: 'Winning Streak', baseDesc: 'Win games in total.', type: 'winsTotal', goals: [10, 25, 50], difficulties: ['gifted', 'expert', 'master'] },
+    { key: 'upgrade_50', baseName: 'Upgrade Collector', baseDesc: 'Buy upgrades in total.', type: 'upgradesTotal', goals: [10, 25, 50], difficulties: ['gifted', 'expert', 'master'] },
+    { key: 'token_500', baseName: 'Token Tycoon', baseDesc: 'Collect tokens in total.', type: 'tokensTotal', goals: [100, 250, 500], difficulties: ['gifted', 'expert', 'master'] },
+    { key: 'barrier_uses_total', baseName: 'Barrier Legend', baseDesc: 'Use Barrier in total.', type: 'barrierTotal', goals: [10, 25, 50], difficulties: ['gifted', 'expert', 'master'] },
+    { key: 'emp_uses_total', baseName: 'EMP Legend', baseDesc: 'Use EMP in total.', type: 'empTotal', goals: [10, 25, 50], difficulties: ['gifted', 'expert', 'master'] },
+    { key: 'sonic_uses_total', baseName: 'Sonic Legend', baseDesc: 'Use Sonic Boom in total.', type: 'sonicTotal', goals: [10, 25, 50], difficulties: ['gifted', 'expert', 'master'] },
+    { key: 'platform_uses_total', baseName: 'Platform Legend', baseDesc: 'Drop through platforms in total.', type: 'platformDropTotal', goals: [10, 25, 50], difficulties: ['gifted', 'expert', 'master'] },
+    { key: 'zero_uses_total', baseName: 'Zero Gravity Legend', baseDesc: 'Use Zero Gravity in total.', type: 'zeroGravityTotal', goals: [10, 25, 50], difficulties: ['gifted', 'expert', 'master'] },
+    { key: 'cat_play_total', baseName: 'CATsby Legend', baseDesc: 'Play as CATsby in total.', type: 'catPlayedTotal', goals: [10, 25, 50], difficulties: ['gifted', 'expert', 'master'] },
+    { key: 'robot_play_total', baseName: 'Tekno Legend', baseDesc: 'Play as Tekno in total.', type: 'robotPlayedTotal', goals: [10, 25, 50], difficulties: ['gifted', 'expert', 'master'] },
+    // Gabbie (formerly Zara) total play achievement
+    { key: 'gabbie_play_total', baseName: 'Gabbie Legend', baseDesc: 'Play as Gabbie in total.', type: 'gabbiePlayedTotal', goals: [10, 25, 50], difficulties: ['gifted', 'expert', 'master'] },
+    { key: 'gabbie_play_total', baseName: 'Gabbie Legend', baseDesc: 'Play on Gabbie\'s Grave in total.', type: 'gabbiesGravePlayedTotal', goals: [10, 25, 50], difficulties: ['gifted', 'expert', 'master'] },
+    { key: 'jump_500', baseName: 'Jump Master', baseDesc: 'Jump in total.', type: 'jumpsTotal', goals: [100, 250, 500], difficulties: ['gifted', 'expert', 'master'] },
+    { key: 'settings_10', baseName: 'Settings Master', baseDesc: 'Change settings in total.', type: 'settingsChangedTotal', goals: [5, 10, 20], difficulties: ['gifted', 'expert', 'master'] },
+    { key: 'menu_10', baseName: 'Menu Master', baseDesc: 'Open the main menu in total.', type: 'menuOpenedTotal', goals: [5, 10, 20], difficulties: ['gifted', 'expert', 'master'] }
+];
+
+// Super hard/creative one-time expert/master achievements (all possible in-game)
+const SPECIAL_ACHIEVEMENTS = [
+    // Master achievement: Win on all maps
+    { key: 'all_maps_win', name: 'Map Master', desc: 'Win a game on every map.', goal: 1, type: 'allMapsWin', difficulty: 'master' },
+
+    // Master achievement: Win with every character
+    { key: 'all_characters_win', name: 'Character Master', desc: 'Win a game with every character.', goal: 1, type: 'allCharactersWin', difficulty: 'master' },
+
+    // Expert achievements: Beat the game with each main character
+    { key: 'turnup_expert_win', name: 'Turnup Expert', desc: 'Win a game as Turnup on any map (Expert).', goal: 1, type: 'turnupExpertWin', difficulty: 'expert' },
+    { key: 'gabbie_expert_win', name: 'Gabbie Expert', desc: 'Win a game as Gabbie on any map (Expert).', goal: 1, type: 'gabbieExpertWin', difficulty: 'expert' },
+    { key: 'catsby_expert_win', name: 'CATsby Expert', desc: 'Win a game as CATsby on any map (Expert).', goal: 1, type: 'catsbyExpertWin', difficulty: 'expert' },
+    { key: 'tekno_expert_win', name: 'Tekno Expert', desc: 'Win a game as Tekno on any map (Expert).', goal: 1, type: 'teknoExpertWin', difficulty: 'expert' },
+    { key: 'pluto_expert_win', name: 'Pluto Expert', desc: 'Win a game as Pluto on any map (Expert).', goal: 1, type: 'plutoExpertWin', difficulty: 'expert' },
+    { key: 'pete_expert_win', name: 'Pete Expert', desc: 'Win a game as Pete on any map (Expert).', goal: 1, type: 'peteExpertWin', difficulty: 'expert' },
+    { key: 'no_damage_win', name: 'Untouchable', desc: 'Win a game without taking any damage.', goal: 1, type: 'noDamageWin', difficulty: 'expert' },
+    { key: 'no_star_win', name: 'Minimalist', desc: 'Win a game without collecting a single star.', goal: 1, type: 'noStarWin', difficulty: 'expert' },
+    { key: 'all_bombs_survived', name: 'Bomb Magnet', desc: 'Survive every bomb in a standard round without dying.', goal: 1, type: 'allBombsSurvived', difficulty: 'expert' },
+    { key: 'no_powerups_win', name: 'Pure Skill', desc: 'Win a game without using any powerups.', goal: 1, type: 'noPowerupsWin', difficulty: 'expert' },
+    // Only include if all upgrades can be bought in one run:
+    // { key: 'all_upgrades_bought', name: 'Fully Loaded', desc: 'Buy every upgrade in a single run.', goal: 1, type: 'allUpgradesBought', difficulty: 'master' },
+    { key: 'max_level', name: 'Ascended', desc: 'Reach the maximum level possible.', goal: 1, type: 'maxLevel', difficulty: 'master' },
+    { key: 'flawless_run', name: 'Flawless', desc: 'Complete a run without dying or taking damage.', goal: 1, type: 'flawlessRun', difficulty: 'master' },
+    // Only include if there are secrets in maps:
+    // { key: 'secret_found', name: 'Secret Finder', desc: 'Find the hidden secret in any map.', goal: 1, type: 'secretFound', difficulty: 'master' },
+    // Only include if you can win as both Tekno and CATsby in one session:
+    // { key: 'robot_cat_win', name: 'Unlikely Duo', desc: 'Win a game as Tekno and CATsby in the same session.', goal: 1, type: 'robotCatWin', difficulty: 'master' },
+    { key: 'speedrunner', name: 'Speedrunner', desc: 'Win a game in under 2 minutes.', goal: 1, type: 'speedrunner', difficulty: 'master' }
+];
+
+// Roman numerals for tiers
+const ROMAN = ['I', 'II', 'III'];
+
+// Expand base achievements to 3 tiers (where applicable) and add special achievements
+const ACHIEVEMENTS = [
+    ...BASE_ACHIEVEMENTS.flatMap(base => {
+        // Only show the next uncompleted tier for each achievement type
+        let progress = 0;
+        let foundIncomplete = false;
+        return base.goals.map((goal, i) => {
+            return {
+                key: `${base.key}_tier${i+1}`,
+                name: `${base.baseName} ${ROMAN[i]}`,
+                desc: `${base.baseDesc} ${goal === 1 ? '' : `(${goal})`}`,
+                goal,
+                type: base.type,
+                difficulty: base.difficulties[i] || base.difficulties[base.difficulties.length-1],
+                tierIndex: i
+            };
+        });
+    }).filter((ach, idx, arr) => {
+        // Only show the first incomplete tier for each achievement type, or all completed tiers
+        const prevTiers = arr.filter(a => a.type === ach.type && a.tierIndex < ach.tierIndex);
+        // If any previous tier is not complete, don't show this tier
+        if (ach.tierIndex > 0 && prevTiers.some(pt => !window.getProgress || (window.getProgress(pt) < pt.goal))) {
+            return false;
+        }
+        // If this tier is not complete, show it; if complete, show it as well
+        return true;
+    }),
+    ...SPECIAL_ACHIEVEMENTS
+];
+
+export function showAchievements(scene, getProgress) {
+    // Clear existing content
+    scene.children.removeAll();
+    scene.particles = [];
+
+    // Background
+    let bg = scene.add.image(725, 475, 'sky').setAlpha(0.95);
+    bg.setScale(1450 / bg.width, 950 / bg.height);
+    bg.setTint(0x88aaff);
+
+    // Main container
+    const achContainer = scene.add.rectangle(725, 475, 1100, 800, 0x111133, 0.97);
+    achContainer.setStrokeStyle(6, 0xffcc00);
+    const containerGlow = scene.add.rectangle(725, 475, 1120, 820, 0xffcc00, 0.08);
+
+    // Title
+    const achTitle = scene.add.text(725, 110, 'ACHIEVEMENTS', {
+        fontFamily: 'Arial Black',
+        fontSize: 72,
+        color: '#ffcc00',
+        stroke: '#000033',
+        strokeThickness: 10,
+        align: 'center',
+        shadow: {
+            offsetX: 4,
+            offsetY: 4,
+            color: '#000033',
+            blur: 12,
+            fill: true
+        }
+    }).setOrigin(0.5);
+    scene.tweens.add({
+        targets: achTitle,
+        scaleX: 1.05,
+        scaleY: 1.05,
+        duration: 3000,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.easeInOut'
+    });
+
+    // Scrollable area for achievements
+    const scrollArea = scene.add.rectangle(725, 475, 900, 540, 0x222244, 0.93).setStrokeStyle(3, 0xffcc00);
+    scrollArea.setOrigin(0.5);
+    const maskShape = scene.make.graphics({x:0, y:0, add:false});
+    maskShape.fillRect(275, 205, 900, 540);
+    const mask = maskShape.createGeometryMask();
+
+    // Render achievements grouped by difficulty
+    const textContainer = scene.add.container(275, 205);
+    let y = 0;
+    DIFFICULTY_LEVELS.forEach(diff => {
+        const header = scene.add.text(0, y, diff.label, {
+            fontFamily: 'Arial Black', fontSize: 44, color: diff.color, stroke: '#000', strokeThickness: 6
+        });
+        textContainer.add(header);
+        y += 54;
+        ACHIEVEMENTS.filter(a => a.difficulty === diff.key).forEach((ach, i) => {
+            const progress = getProgress(ach);
+            const percent = Math.min(1, progress / ach.goal);
+            const isComplete = percent >= 1;
+            const achBox = scene.add.rectangle(450, y + 40, 860, 70, isComplete ? 0x44ff66 : 0x333355, isComplete ? 0.18 : 0.10).setStrokeStyle(2, isComplete ? 0xffcc00 : 0x8888aa);
+            const name = scene.add.text(60, y + 10, ach.name, {
+                fontFamily: 'Arial Black', fontSize: 32, color: isComplete ? '#ffe066' : '#fff', stroke: '#000', strokeThickness: 4
+            });
+            const desc = scene.add.text(60, y + 44, ach.desc, {
+                fontFamily: 'Arial', fontSize: 22, color: '#cccccc', stroke: '#000', strokeThickness: 2
+            });
+            if (isComplete) {
+                // Show complete text instead of progress bar
+                const completeText = scene.add.text(700, y + 45, 'Complete!', {
+                    fontFamily: 'Arial Black', fontSize: 26, color: '#44ff66', stroke: '#000', strokeThickness: 4
+                }).setOrigin(0.5);
+                textContainer.add([achBox, name, desc, completeText]);
+            } else {
+                // Progress bar
+                const barBg = scene.add.rectangle(700, y + 45, 260, 18, 0x222222, 0.7);
+                const bar = scene.add.rectangle(570, y + 45, Math.max(8, 260 * percent), 18, 0xffcc00, 0.7).setOrigin(0, 0.5);
+                // Progress text stays to the left of the bar
+                const progressText = scene.add.text(570 - 10, y + 45, `${Math.floor(progress)}/${ach.goal}`, {
+                    fontFamily: 'Arial Black', fontSize: 20, color: '#fff', stroke: '#000', strokeThickness: 3, align: 'right'
+                }).setOrigin(1, 0.5);
+                textContainer.add([achBox, name, desc, barBg, bar, progressText]);
+            }
+            y += 80;
+        });
+        y += 20;
+    });
+    textContainer.setMask(mask);
+
+    // Scrollbar UI (same as rules)
+    const scrollBarHeight = 540;
+    const scrollBarY = 475;
+    const scrollBarX = 1200;
+    const barBg = scene.add.rectangle(scrollBarX, scrollBarY, 18, scrollBarHeight, 0x333300, 0.7);
+    const bar = scene.add.rectangle(scrollBarX, scrollBarY - scrollBarHeight/2 + 40, 18, 80, 0xffcc00, 0.95).setInteractive();
+    bar.setOrigin(0.5, 0);
+    let dragging = false;
+    let dragOffsetY = 0;
+    bar.on('pointerdown', (pointer) => { dragging = true; dragOffsetY = pointer.y - bar.y; });
+    scene.input.on('pointerup', () => { dragging = false; });
+    scene.input.on('pointermove', (pointer) => {
+        if (dragging) {
+            let newY = pointer.y - dragOffsetY;
+            newY = Math.max(scrollBarY - scrollBarHeight/2, Math.min(scrollBarY + scrollBarHeight/2 - bar.height, newY));
+            bar.y = newY;
+            const scrollPercent = (bar.y - (scrollBarY - scrollBarHeight/2)) / (scrollBarHeight - bar.height);
+            const maxScroll = Math.max(0, y - 540);
+            textContainer.y = 205 - scrollPercent * maxScroll;
+        }
+    });
+    // Mouse wheel scroll
+    scene.input.on('wheel', (pointer, gameObjects, deltaX, deltaY) => {
+        let scroll = (bar.y - (scrollBarY - scrollBarHeight/2)) + deltaY * 0.2;
+        scroll = Math.max(0, Math.min(scrollBarHeight - bar.height, scroll));
+        bar.y = scrollBarY - scrollBarHeight/2 + scroll;
+        const scrollPercent = scroll / (scrollBarHeight - bar.height);
+        const maxScroll = Math.max(0, y - 540);
+        textContainer.y = 205 - scrollPercent * maxScroll;
+    });
+    // Touch scroll
+    let lastPointerY = null;
+    scrollArea.setInteractive();
+    scrollArea.on('pointerdown', (pointer) => { lastPointerY = pointer.y; });
+    scrollArea.on('pointerup', () => { lastPointerY = null; });
+    scrollArea.on('pointermove', (pointer) => {
+        if (lastPointerY !== null) {
+            let dy = pointer.y - lastPointerY;
+            lastPointerY = pointer.y;
+            let scroll = (bar.y - (scrollBarY - scrollBarHeight/2)) - dy;
+            scroll = Math.max(0, Math.min(scrollBarHeight - bar.height, scroll));
+            bar.y = scrollBarY - scrollBarHeight/2 + scroll;
+            const scrollPercent = scroll / (scrollBarHeight - bar.height);
+            const maxScroll = Math.max(0, y - 540);
+            textContainer.y = 205 - scrollPercent * maxScroll;
+        }
+    });
+    // Back button
+    scene.createDynamicButton(725, 800, 'BACK TO MENU', '#ff4466', '#ff6688', () => {
+        scene.createDynamicMenu();
+    });
+}

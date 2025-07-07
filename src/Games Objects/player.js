@@ -123,12 +123,15 @@ export class Player extends Phaser.Physics.Arcade.Sprite
                 this.setScale(1); // Normal size (32x48)
                 break;
             case 'cat':
-                // Cat is 542x474, scale down and adjust for better centering
-                this.setScale(0.12); // Increased from 0.08 to make larger
-                break;
             case 'robot':
-                // Robot is 542x474, scale down and adjust for better centering
-                this.setScale(0.12); // Increased from 0.08 to make larger
+            case 'zarazombie':
+            case 'pluto':
+                // All large characters (cat, robot, zara, pluto) use same scale
+                this.setScale(0.12);
+                break;
+            case 'pete':
+                // Pete's sprite is much taller, so use a smaller scale to match others
+                this.setScale(0.055);
                 break;
             default:
                 this.setScale(1);
@@ -136,27 +139,45 @@ export class Player extends Phaser.Physics.Arcade.Sprite
     }
 
     initAnimations(){
-    // Try to create animations, but handle cases where sprites might not be proper spritesheets
+    // Use Zara's animation frames for Pluto as well
     try {
-        this.anims.create({
-            key: 'left',
-            frames: this.anims.generateFrameNumbers(this.characterKey, { start: 0, end: 3 }),
-            frameRate: 10,
-            repeat: -1
-        });
-
-        this.anims.create({
-            key: 'turn',
-            frames: [ { key: this.characterKey, frame: 4 } ],
-            frameRate: 1
-        });
-
-        this.anims.create({
-            key: 'right',
-            frames: this.anims.generateFrameNumbers(this.characterKey, { start: 5, end: 8 }),
-            frameRate: 10,
-            repeat: -1
-        });
+        if (this.characterKey === 'zarazombie' || this.characterKey === 'pluto' || this.characterKey === 'pete') {
+            this.anims.create({
+                key: this.characterKey + '-left',
+                frames: this.anims.generateFrameNumbers(this.characterKey, { start: 0, end: 3 }),
+                frameRate: 10,
+                repeat: -1
+            });
+            this.anims.create({
+                key: this.characterKey + '-turn',
+                frames: [ { key: this.characterKey, frame: 4 } ],
+                frameRate: 1
+            });
+            this.anims.create({
+                key: this.characterKey + '-right',
+                frames: this.anims.generateFrameNumbers(this.characterKey, { start: 5, end: 8 }),
+                frameRate: 10,
+                repeat: -1
+            });
+        } else {
+            this.anims.create({
+                key: 'left',
+                frames: this.anims.generateFrameNumbers(this.characterKey, { start: 0, end: 3 }),
+                frameRate: 10,
+                repeat: -1
+            });
+            this.anims.create({
+                key: 'turn',
+                frames: [ { key: this.characterKey, frame: 4 } ],
+                frameRate: 1
+            });
+            this.anims.create({
+                key: 'right',
+                frames: this.anims.generateFrameNumbers(this.characterKey, { start: 5, end: 8 }),
+                frameRate: 10,
+                repeat: -1
+            });
+        }
     } catch (error) {
         // Fallback: create simple animations using just the first frame if it's not a full spritesheet
         console.warn(`Character ${this.characterKey} may not be a proper spritesheet, using fallback animations`);
@@ -166,13 +187,11 @@ export class Player extends Phaser.Physics.Arcade.Sprite
                 frames: [ { key: this.characterKey, frame: 0 } ],
                 frameRate: 1
             });
-
             this.anims.create({
                 key: 'turn',
                 frames: [ { key: this.characterKey, frame: 0 } ],
                 frameRate: 1
             });
-
             this.anims.create({
                 key: 'right',
                 frames: [ { key: this.characterKey, frame: 0 } ],
@@ -187,18 +206,30 @@ export class Player extends Phaser.Physics.Arcade.Sprite
 moveLeft(){
     const currentSpeed = this.getCurrentSpeed();
     this.setVelocityX(-currentSpeed);
-    this.anims.play('left', true);
+    if (this.characterKey === 'zarazombie' || this.characterKey === 'pluto' || this.characterKey === 'pete') {
+        this.anims.play(this.characterKey + '-left', true);
+    } else {
+        this.anims.play('left', true);
+    }
 }
 
 moveRight(){
     const currentSpeed = this.getCurrentSpeed();
     this.setVelocityX(currentSpeed);
-    this.anims.play('right', true);
+    if (this.characterKey === 'zarazombie' || this.characterKey === 'pluto' || this.characterKey === 'pete') {
+        this.anims.play(this.characterKey + '-right', true);
+    } else {
+        this.anims.play('right', true);
+    }
 }
 
 idle(){
     this.setVelocityX(0);
-    this.anims.play('turn');
+    if (this.characterKey === 'zarazombie' || this.characterKey === 'pluto' || this.characterKey === 'pete') {
+        this.anims.play(this.characterKey + '-turn');
+    } else {
+        this.anims.play('turn');
+    }
 }
 
 getCurrentSpeed() {
@@ -410,10 +441,9 @@ getUpgradeCost(abilityName, currentRank) {
         extraLife: [] // Will be handled by default return
     };
     
-    // Special handling for extraLife - cost increases by 1 token each time
+    // Special handling for extraLife - always costs 5 tokens
     if (abilityName === 'extraLife') {
-        // Cost is 5 tokens for the first, then +1 for each additional purchase
-        return { tokens: 5 + (currentRank || 0), specialTokens: 0 };
+        return { tokens: 5, specialTokens: 0 };
     }
     
     return costs[abilityName][currentRank] || { tokens: 0, specialTokens: 0 };

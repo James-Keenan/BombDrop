@@ -1,37 +1,53 @@
 import mapOne from '../maps/mapOne.js';
 import robotMap from '../maps/robotMap.js';
+import { catsbyCorner } from '../maps/catsbyCorner.js';
+import { gabbiesGrave } from '../maps/gabbiesGrave.js';
+import { peteStreet } from '../maps/peteStreet.js';
 import { showPlayerSelect } from '../ui/playerSelect.js';
 import { showMapSelect } from '../ui/mapSelect.js';
 import { showSettings } from '../ui/settings.js';
+import { getRandomQuote, showThoughtBubble } from '../ui/playerQuotes.js';
+import { showAchievements } from '../ui/achievements.js';
 
 export class MainMenu extends Phaser.Scene {
     constructor() {
         super('MainMenu');
         this.characters = [
+            { key: 'random', label: '???', previewKey: 'question_mark', previewFrame: 0, scale: 2.5, isRandom: true },
             { key: 'dude', label: 'Turnup', previewKey: 'dude', previewFrame: 4, scale: 2.5 },
             { key: 'cat', label: 'CATsby', previewKey: 'cat', previewFrame: 4, scale: 0.25 },
             { key: 'robot', label: 'Tekno', previewKey: 'robot', previewFrame: 4, scale: 0.25, quotes: [
                 'Ctrl, Alt, Elite'
+            ] },
+            { key: 'zarazombie', label: 'Gabbie', previewKey: 'zarazombie', previewFrame: 4, scale: 0.25, quotes: [
+                'Brains... or bombs?',
+                'Zombies just want to have fun!',
+                'Unstoppable Gabbie!',
+                'I love the smell of bombs in the morning.'
+            ] },
+            { key: 'pluto', label: 'Pluto', previewKey: 'pluto', previewFrame: 4, scale: 0.25, quotes: [
+                'Out of this world!',
+                'Pluto power!',
+                'Ready for launch!'
+            ] },
+            { key: 'pete', label: 'Pete', previewKey: 'pete', previewFrame: 4, scale: 0.12, quotes: [
+                'Possum up!',
+                'Night shift ready.',
+                'Sneaky and speedy!'
             ] }
         ];
-        this.selectedCharacterIndex = 0;
+        this.selectedCharacterIndex = 0; // Default to random
         this.dynamicElements = [];
         this.particles = [];
         this.availableMaps = [
-            {
-                key: 'mapOne',
-                label: "Turnup's Trail",
-                data: mapOne,
-                previewKey: 'MapOne', // must match loaded image key
-            },
-            {
-                key: 'robotMap',
-                label: "Tekno's Terminal",
-                data: robotMap,
-                previewKey: 'robotMap', // must match loaded image key
-            }
+            { key: 'random', label: '???', data: null, previewKey: 'question_mark_map', isRandom: true },
+            { key: 'mapOne', label: "Turnup's Trail", data: mapOne, previewKey: 'MapOne' },
+            { key: 'catsbyCorner', label: "Catsby's Corner", data: catsbyCorner, previewKey: 'catBackground' },
+            { key: 'robotMap', label: "Tekno's Terminal", data: robotMap, previewKey: 'robotMap' },
+            { key: 'gabbiesGrave', label: "Gabbie's Grave", data: gabbiesGrave, previewKey: 'gabbies_grave_preview' },
+            { key: 'peteStreet', label: "Pete's Street", data: peteStreet, previewKey: 'petesMap' }
         ];
-        this.selectedMapIndex = 0;
+        this.selectedMapIndex = 0; // Default to random
     }
 
     create() {
@@ -251,36 +267,58 @@ export class MainMenu extends Phaser.Scene {
         const highScore = localStorage.getItem('highScore') || 0;
         const highestLevel = localStorage.getItem('highestLevel') || 1;
 
-        // Personal Best container
-        const scoreContainer = this.add.container(centerX - 150, statsY);
-        const scoreBg = this.add.rectangle(0, 0, 280, 60, 0x003366, 0.8);
+        // Personal Best container (wider, more padding, single-line text)
+        const scoreContainer = this.add.container(centerX - 220, statsY);
+        const scoreBg = this.add.rectangle(0, 0, 370, 70, 0x003366, 0.85);
         scoreBg.setStrokeStyle(3, 0x66aaff);
         
-        const scoreIcon = this.add.image(-80, 0, 'star').setScale(0.7).setTint(0xffff66);
-        const scoreText = this.add.text(20, 0, `Personal Best: ${highScore}`, {
+        const scoreIcon = this.add.image(-130, 0, 'star').setScale(0.7).setTint(0xffff66);
+        // Increase text width and allow dynamic font size reduction
+        let scoreFontSize = 26;
+        const scoreText = this.add.text(0, 0, `Personal Best: ${highScore}`, {
             fontFamily: 'Arial Black',
-            fontSize: 18,
+            fontSize: scoreFontSize,
             color: '#ffffff',
             stroke: '#000033',
-            strokeThickness: 2
+            strokeThickness: 4,
+            align: 'center',
+            fixedWidth: 310,
+            maxLines: 1,
+            wordWrap: false,
+            overflow: 'hidden',
+            padding: { left: 0, right: 0, top: 0, bottom: 0 }
         }).setOrigin(0.5);
-
+        // Shrink font size until it fits
+        while (scoreText.width > 310 && scoreFontSize > 14) {
+            scoreFontSize -= 2;
+            scoreText.setFontSize(scoreFontSize);
+        }
         scoreContainer.add([scoreBg, scoreIcon, scoreText]);
 
-        // Highest Level container
-        const levelContainer = this.add.container(centerX + 150, statsY);
-        const levelBg = this.add.rectangle(0, 0, 280, 60, 0x663300, 0.8);
+        // Highest Level container (wider, more padding, single-line text)
+        const levelContainer = this.add.container(centerX + 220, statsY);
+        const levelBg = this.add.rectangle(0, 0, 370, 70, 0x663300, 0.85);
         levelBg.setStrokeStyle(3, 0xff9933);
         
-        const levelIcon = this.add.image(-80, 0, 'bomb').setScale(0.4).setTint(0xff9933);
-        const levelText = this.add.text(20, 0, `Highest Level: ${highestLevel}`, {
+        const levelIcon = this.add.image(-130, 0, 'bomb').setScale(0.4).setTint(0xff9933);
+        let levelFontSize = 26;
+        const levelText = this.add.text(0, 0, `Highest Level: ${highestLevel}`, {
             fontFamily: 'Arial Black',
-            fontSize: 18,
+            fontSize: levelFontSize,
             color: '#ffffff',
             stroke: '#330000',
-            strokeThickness: 2
+            strokeThickness: 4,
+            align: 'center',
+            fixedWidth: 310,
+            maxLines: 1,
+            wordWrap: false,
+            overflow: 'hidden',
+            padding: { left: 0, right: 0, top: 0, bottom: 0 }
         }).setOrigin(0.5);
-
+        while (levelText.width > 310 && levelFontSize > 14) {
+            levelFontSize -= 2;
+            levelText.setFontSize(levelFontSize);
+        }
         levelContainer.add([levelBg, levelIcon, levelText]);
 
         // Floating animations for stats
@@ -343,15 +381,81 @@ export class MainMenu extends Phaser.Scene {
             }
         }).setOrigin(0.5);
 
-        // Make the start button even bigger and lower it slightly
-        const startButton = this.createDynamicButton(centerX, 440, 'START GAME', '#ff4466', '#ff6688', () => {
+
+
+        // --- HOW TO PLAY and ACHIEVEMENTS BUTTONS ---
+        // Place Achievements and Settings in the top right, but HOW TO PLAY in the center below good luck
+        const iconX = 1370;
+        const iconY = 70;
+        // Settings button (gear)
+        const settingsBtn = this.add.text(iconX, iconY, '\u2699', {
+            fontFamily: 'Arial Black', fontSize: 54, color: '#00ffd0', stroke: '#000', strokeThickness: 7
+        }).setOrigin(0.5).setDepth(200).setInteractive({ useHandCursor: true });
+        settingsBtn.on('pointerdown', () => {
+            const username = localStorage.getItem('username') || 'Player';
+            showSettings(this, username, (newName) => {
+                localStorage.setItem('username', newName);
+                if (this.goodLuckText) {
+                    this.goodLuckText.setText(`Good luck, ${newName || 'Player'}!`);
+                }
+            });
+        });
+        settingsBtn.on('pointerover', () => {
+            this.tweens.add({
+                targets: settingsBtn,
+                angle: 360,
+                duration: 700,
+                onComplete: () => settingsBtn.setAngle(0)
+            });
+        });
+
+        // Achievements button (trophy icon)
+        const achievementsBtn = this.add.text(iconX - 70, iconY, '\ud83c\udfc6', {
+            fontFamily: 'Arial Black', fontSize: 48, color: '#ffe066', stroke: '#b8860b', strokeThickness: 5
+        }).setOrigin(0.5).setDepth(200).setInteractive({ useHandCursor: true });
+        achievementsBtn.on('pointerdown', () => {
+            showAchievements(this, (ach) => {
+                // Example: get progress from localStorage or registry
+                // You should expand this logic to track all achievement types
+                if (ach.type === 'stars') return parseInt(localStorage.getItem('totalStars') || '0', 10);
+                if (ach.type === 'bombs_avoided') return parseInt(localStorage.getItem('bombsAvoided') || '0', 10);
+                if (ach.type === 'level') return parseInt(localStorage.getItem('highestLevel') || '0', 10);
+                if (ach.type === 'deaths') return parseInt(localStorage.getItem('deaths') || '0', 10);
+                if (ach.type === 'wins') return parseInt(localStorage.getItem('wins') || '0', 10);
+                if (ach.type === 'upgrades') return parseInt(localStorage.getItem('upgrades') || '0', 10);
+                if (ach.type === 'tokens') return parseInt(localStorage.getItem('tokens') || '0', 10);
+                if (ach.type === 'barrier') return parseInt(localStorage.getItem('barrier') || '0', 10);
+                if (ach.type === 'emp') return parseInt(localStorage.getItem('emp') || '0', 10);
+                if (ach.type === 'sonic') return parseInt(localStorage.getItem('sonic') || '0', 10);
+                if (ach.type === 'platformDrop') return parseInt(localStorage.getItem('platformDrop') || '0', 10);
+                if (ach.type === 'zeroGravity') return parseInt(localStorage.getItem('zeroGravity') || '0', 10);
+                if (ach.type === 'catsbyUnlocked') return localStorage.getItem('catsbyUnlocked') === 'true' ? 1 : 0;
+                if (ach.type === 'robotUnlocked') return localStorage.getItem('robotUnlocked') === 'true' ? 1 : 0;
+                if (ach.type === 'gabbiePlayed') return localStorage.getItem('gabbiePlayed') === 'true' ? 1 : 0;
+                if (ach.type === 'gabbiesGravePlayed') return localStorage.getItem('gabbiesGravePlayed') === 'true' ? 1 : 0;
+                // ...add more as needed
+                return 0;
+            });
+        });
+        achievementsBtn.on('pointerover', () => { achievementsBtn.setColor('#fff799'); });
+        achievementsBtn.on('pointerout', () => { achievementsBtn.setColor('#ffe066'); });
+        this.dynamicElements.push(settingsBtn);
+        this.dynamicElements.push(achievementsBtn);
+
+        // HOW TO PLAY button (centered, below good luck message)
+        const howToPlayBtn = this.createDynamicButton(centerX, 410, 'HOW TO PLAY', '#44ff66', '#66ff99', () => {
+            this.showRules();
+        });
+        this.dynamicElements.push(howToPlayBtn);
+
+        // Place START GAME button at the bottom, styled green
+        const startButton = this.createDynamicButton(centerX, 900, 'START GAME', '#44ff66', '#66ff99', () => {
             console.log('Start button clicked!');
             this.registry.set('selectedCharacter', this.characters[this.selectedCharacterIndex].key);
             console.log('Selected character:', this.characters[this.selectedCharacterIndex].key);
             this.startGameTransition();
         });
-        // Make the button visually even larger
-        startButton.setScale(1.7, 1.45);
+        startButton.setScale(2, 1.5);
 
         // Add connecting energy between buttons (lowered to match new button position)
         const energyLine = this.add.rectangle(centerX, 510, 350, 4, 0x66aaff, 0.6);
@@ -389,10 +493,10 @@ export class MainMenu extends Phaser.Scene {
             }
             this.showcaseGroup.destroy();
         }
-        // Raise the showcase higher so it doesn't cover the choose buttons
-        const y = 640;
-        const char = this.characters[this.selectedCharacterIndex];
-        const map = this.availableMaps[this.selectedMapIndex];
+        // Raise the showcase so it does not intersect with START GAME
+        const y = 700;
+        let char = this.characters[this.selectedCharacterIndex];
+        let map = this.availableMaps[this.selectedMapIndex];
 
         // Create a container for all showcase elements
         this.showcaseGroup = this.add.container(0, 0);
@@ -445,14 +549,51 @@ export class MainMenu extends Phaser.Scene {
             this.showcaseGroup.add(sparkle);
         }
 
-        // Character panel (left)
+        // Center the Choose Player/Map buttons between HOW TO PLAY and the showcase
+        // HOW TO PLAY is at y=410, showcase top is y-135 (645-135=510)
+        // Lower the buttons slightly more to avoid overlap with HOW TO PLAY
+        const chooseBtnY = 495;
         const charX = centerX - 260;
+        createShowcaseButton(charX, chooseBtnY, 'CHOOSE PLAYER', '#ffaa00', '#ffff66', () => {
+            showPlayerSelect(this, this.characters, (chosenIdx) => {
+                this.selectedCharacterIndex = chosenIdx;
+                if (this.updateShowcase) this.updateShowcase();
+                // Show a new quote bubble for the newly selected player
+                if (this.thoughtBubble) this.thoughtBubble.destroy();
+                const char = this.characters[chosenIdx];
+                const charKey = char.key === 'random' ? null : char.key;
+                if (charKey) {
+                    const quote = getRandomQuote(charKey);
+                    if (quote) {
+                        const bubbleX = charX + 90;
+                        const bubbleY = y - 120;
+                        this.thoughtBubble = showThoughtBubble(this, bubbleX, bubbleY, quote);
+                        this.thoughtBubble.setDepth(20);
+                    }
+                }
+            });
+        });
+        // Character panel (left)
         const charPanel = this.add.rectangle(charX, y, 220, panelHeight-40, 0x222244, 0.92).setStrokeStyle(5, 0xffff66).setDepth(11);
         const charGlow = this.add.circle(charX, y, 80, 0xffff66, 0.18).setDepth(12);
-        const charSprite = this.add.sprite(charX, y-10, char.previewKey, char.previewFrame)
-            .setScale(char.scale * 1.7)
-            .setOrigin(0.5)
-            .setDepth(13);
+        let charSprite;
+        if (char.isRandom) {
+            charSprite = this.add.image(charX, y-10, 'question_mark')
+                .setDisplaySize(120, 120)
+                .setOrigin(0.5)
+                .setDepth(13);
+        } else {
+            // For Zara, offset the sprite only (not the label) to visually center with her name
+            let spriteX = charX;
+            if (char.key === 'zarazombie') {
+                spriteX = charX + 22; // Adjust this value as needed for perfect centering
+            }
+            charSprite = this.add.sprite(spriteX, y-10, char.previewKey, char.previewFrame)
+                .setScale(char.scale * 1.7)
+                .setOrigin(0.5)
+                .setDepth(13);
+        }
+        // Always center the label at charX, not spriteX, so the name is centered in the slot
         const charLabel = this.add.text(charX, y + 70, char.label, {
             fontFamily: 'ArcadeClassic, Arial Black', fontSize: 32, color: '#ffff66', stroke: '#000', strokeThickness: 6, shadow: { offsetX: 2, offsetY: 2, color: '#000', blur: 8, fill: true }
         }).setOrigin(0.5).setDepth(13);
@@ -460,13 +601,6 @@ export class MainMenu extends Phaser.Scene {
             fontFamily: 'ArcadeClassic, Arial Black', fontSize: 22, color: '#00ffd0', stroke: '#000', strokeThickness: 4
         }).setOrigin(0.5).setDepth(13);
         this.showcaseGroup.add([charPanel, charGlow, charSprite, charLabel, p1Label]);
-        // Choose Player button further below player panel
-        createShowcaseButton(charX, y + 170, 'CHOOSE PLAYER', '#ffaa00', '#ffff66', () => {
-            showPlayerSelect(this, this.characters, (chosenIdx) => {
-                this.selectedCharacterIndex = chosenIdx;
-                if (this.updateShowcase) this.updateShowcase();
-            });
-        });
 
         // Glowing VS badge (center, animated)
         const vsGlow = this.add.circle(centerX, y, 60, 0xff4466, 0.18).setDepth(13);
@@ -485,14 +619,29 @@ export class MainMenu extends Phaser.Scene {
         });
         this.showcaseGroup.add([vsGlow, vsText]);
 
-        // Map panel (right)
+        // Choose Map button, also centered
         const mapX = centerX + 260;
+        createShowcaseButton(mapX, chooseBtnY, 'CHOOSE MAP', '#00ffd0', '#00aaff', () => {
+            showMapSelect(this, this.availableMaps, (chosenIdx) => {
+                this.selectedMapIndex = chosenIdx;
+                if (this.updateShowcase) this.updateShowcase();
+            });
+        });
+        // Map panel (right)
         const mapPanel = this.add.rectangle(mapX, y, 260, panelHeight-40, 0x223344, 0.92).setStrokeStyle(5, 0x00ffd0).setDepth(11);
         const mapGlow = this.add.circle(mapX, y, 90, 0x00ffd0, 0.18).setDepth(12);
-        const mapSprite = this.add.image(mapX, y-10, map.previewKey)
-            .setDisplaySize(260, 160)
-            .setOrigin(0.5)
-            .setDepth(13);
+        let mapSprite;
+        if (map.isRandom) {
+            mapSprite = this.add.image(mapX, y-10, 'question_mark_map')
+                .setDisplaySize(180, 120)
+                .setOrigin(0.5)
+                .setDepth(13);
+        } else {
+            mapSprite = this.add.image(mapX, y-10, map.previewKey)
+                .setDisplaySize(260, 160)
+                .setOrigin(0.5)
+                .setDepth(13);
+        }
         const mapLabel = this.add.text(mapX, y + 70, map.label, {
             fontFamily: 'ArcadeClassic, Arial Black', fontSize: 32, color: '#00ffd0', stroke: '#000', strokeThickness: 6, shadow: { offsetX: 2, offsetY: 2, color: '#000', blur: 8, fill: true }
         }).setOrigin(0.5).setDepth(13);
@@ -500,13 +649,6 @@ export class MainMenu extends Phaser.Scene {
             fontFamily: 'ArcadeClassic, Arial Black', fontSize: 22, color: '#ffaa00', stroke: '#000', strokeThickness: 4
         }).setOrigin(0.5).setDepth(13);
         this.showcaseGroup.add([mapPanel, mapGlow, mapSprite, mapLabel, arenaLabel]);
-        // Choose Map button further below map panel
-        createShowcaseButton(mapX, y + 170, 'CHOOSE MAP', '#00ffd0', '#00aaff', () => {
-            showMapSelect(this, this.availableMaps, (chosenIdx) => {
-                this.selectedMapIndex = chosenIdx;
-                if (this.updateShowcase) this.updateShowcase();
-            });
-        });
 
         // Add to dynamicElements for cleanup
         this.dynamicElements.push(this.showcaseGroup);
@@ -515,15 +657,18 @@ export class MainMenu extends Phaser.Scene {
     createDynamicButton(x, y, text, primaryColor, hoverColor, callback) {
         const container = this.add.container(x, y);
 
-        // Enhanced button with multiple layers
-        const outerGlow = this.add.rectangle(0, 0, 370, 70, parseInt(primaryColor.replace('#', '0x')), 0.2);
-        const buttonBg = this.add.rectangle(0, 0, 350, 60, 0x001133, 0.9);
+        // Make CHOOSE PLAYER and CHOOSE MAP buttons bigger
+        const isShowcaseButton = text === 'CHOOSE PLAYER' || text === 'CHOOSE MAP';
+        const width = isShowcaseButton ? 420 : 350;
+        const height = isShowcaseButton ? 80 : 60;
+        const outerGlow = this.add.rectangle(0, 0, width + 20, height + 10, parseInt(primaryColor.replace('#', '0x')), 0.2);
+        const buttonBg = this.add.rectangle(0, 0, width, height, 0x001133, 0.9);
         buttonBg.setStrokeStyle(4, primaryColor);
-        const innerHighlight = this.add.rectangle(0, -2, 340, 3, parseInt(primaryColor.replace('#', '0x')), 0.8);
+        const innerHighlight = this.add.rectangle(0, -2, width - 10, 3, parseInt(primaryColor.replace('#', '0x')), 0.8);
 
         const buttonText = this.add.text(0, 0, text, {
             fontFamily: 'Arial Black',
-            fontSize: 28,
+            fontSize: isShowcaseButton ? 36 : 28,
             color: primaryColor,
             stroke: '#000033',
             strokeThickness: 5,
@@ -538,7 +683,7 @@ export class MainMenu extends Phaser.Scene {
         }).setOrigin(0.5);
 
         container.add([outerGlow, buttonBg, innerHighlight, buttonText]);
-        container.setSize(350, 60);
+        container.setSize(width, height);
         container.setInteractive();
 
         // Dynamic hover effects
@@ -848,11 +993,18 @@ export class MainMenu extends Phaser.Scene {
 
         // Character preview sprite using the idle frame (frame 4)
         const currentChar = this.characters[this.selectedCharacterIndex];
-        this.characterSprite = this.add.sprite(centerX, centerY, currentChar.previewKey, currentChar.previewFrame)
+        // Shift Zara and Pluto to the right for better centering
+        let charX = centerX;
+        if (currentChar.key === 'zarazombie') {
+            charX = centerX + 36;
+        } else if (currentChar.key === 'pluto') {
+            charX = centerX + 90;
+        }
+        this.characterSprite = this.add.sprite(charX, centerY, currentChar.previewKey, currentChar.previewFrame)
             .setScale(currentChar.scale)
             .setOrigin(0.5);
 
-        // Character label - better spacing below sprite
+        // Character label - always centered under the main centerX
         this.characterLabel = this.add.text(centerX, centerY + 80, this.characters[this.selectedCharacterIndex].label, {
             fontFamily: 'Arial Black',
             fontSize: 24,
@@ -889,12 +1041,19 @@ export class MainMenu extends Phaser.Scene {
 
     changeCharacter(dir) {
         this.selectedCharacterIndex = (this.selectedCharacterIndex + dir + this.characters.length) % this.characters.length;
-        
-        // Update the character preview sprite with correct frame and scale
+        // Update the character preview sprite with correct frame and scale, and move Pluto's sprite to the right
         const currentChar = this.characters[this.selectedCharacterIndex];
+        let charX = 725;
+        if (currentChar.key === 'zarazombie') {
+            charX = 725 + 36;
+        } else if (currentChar.key === 'pluto') {
+            charX = 725 + 90;
+        }
         this.characterSprite.setTexture(currentChar.previewKey, currentChar.previewFrame);
         this.characterSprite.setScale(currentChar.scale);
+        this.characterSprite.setX(charX);
         this.characterLabel.setText(currentChar.label);
+        this.characterLabel.setX(725);
     }
 
     addDecorativeStars() {
@@ -1017,40 +1176,7 @@ export class MainMenu extends Phaser.Scene {
         // Removed 'Press SPACE' instructions as requested
 
         // Add HOW TO PLAY button at the bottom, less prominent
-        const howToPlayButton = this.add.container(centerX, 900);
-        const btnBg = this.add.rectangle(0, 0, 220, 44, 0x003322, 0.7);
-        btnBg.setStrokeStyle(2, 0x44ff66);
-        const btnText = this.add.text(0, 0, 'HOW TO PLAY', {
-            fontFamily: 'Arial Black',
-            fontSize: 20,
-            color: '#44ff66',
-            stroke: '#001100',
-            strokeThickness: 2,
-            align: 'center',
-            shadow: {
-                offsetX: 1,
-                offsetY: 1,
-                color: '#000',
-                blur: 2,
-                fill: true
-            }
-        }).setOrigin(0.5);
-        howToPlayButton.add([btnBg, btnText]);
-        howToPlayButton.setSize(220, 44);
-        howToPlayButton.setInteractive({ useHandCursor: true });
-        howToPlayButton.on('pointerdown', () => {
-            this.showRules();
-        });
-        // Subtle hover effect
-        howToPlayButton.on('pointerover', () => {
-            btnBg.setFillStyle(0x005533, 0.85);
-            btnText.setColor('#66ff99');
-        });
-        howToPlayButton.on('pointerout', () => {
-            btnBg.setFillStyle(0x003322, 0.7);
-            btnText.setColor('#44ff66');
-        });
-        this.dynamicElements.push(howToPlayButton);
+        // (Removed old HOW TO PLAY button at the bottom)
     }
 
     createDynamicAtmosphere() {
@@ -1152,6 +1278,13 @@ export class MainMenu extends Phaser.Scene {
         this.selectedCharacterIndex = (this.selectedCharacterIndex + direction + this.characters.length) % this.characters.length;
         
         const currentChar = this.characters[this.selectedCharacterIndex];
+        // Move Pluto and Zara to the right, keep label centered
+        let charX = 725;
+        if (currentChar.key === 'zarazombie') {
+            charX = 725 + 36;
+        } else if (currentChar.key === 'pluto') {
+            charX = 725 + 90;
+        }
 
         // Enhanced character transition
         this.tweens.add({
@@ -1165,8 +1298,8 @@ export class MainMenu extends Phaser.Scene {
             onComplete: () => {
                 this.characterSprite.setTexture(currentChar.previewKey, currentChar.previewFrame);
                 this.characterSprite.setScale(currentChar.scale);
+                this.characterSprite.setX(charX);
                 this.characterSprite.setRotation(0);
-                
                 this.tweens.add({
                     targets: [this.characterSprite, this.characterGlow],
                     alpha: 1,
@@ -1185,6 +1318,7 @@ export class MainMenu extends Phaser.Scene {
             duration: 200,
             onComplete: () => {
                 this.characterLabel.setText(currentChar.label);
+                this.characterLabel.setX(725);
                 this.tweens.add({
                     targets: this.characterLabel,
                     scaleY: 1,
@@ -1260,10 +1394,43 @@ export class MainMenu extends Phaser.Scene {
     // Removed old createMapSelectionUI and changeMap methods (now handled by overlay)
 
     startGameTransition() {
-        console.log('Starting game transition...');
+        // Handle random player and map selection, but only pick from unlocked
+        let charIdx = this.selectedCharacterIndex;
+        let mapIdx = this.selectedMapIndex;
+        if (this.characters[charIdx].isRandom) {
+            // Only pick from unlocked characters (skip index 0, and locked ones)
+            const unlockedCharIndices = this.characters
+                .map((c, idx) => ({c, idx}))
+                .filter(({c, idx}) => !c.isRandom && (
+                    c.key === 'dude' ||
+                    (c.key === 'cat' && localStorage.getItem('catsbyUnlocked') === 'true') ||
+                    (c.key === 'robot' && localStorage.getItem('robotUnlocked') === 'true')
+                ))
+                .map(({idx}) => idx);
+            if (unlockedCharIndices.length > 0) {
+                charIdx = unlockedCharIndices[Phaser.Math.Between(0, unlockedCharIndices.length - 1)];
+            } else {
+                charIdx = 1; // fallback to Turnup
+            }
+        }
+        if (this.availableMaps[mapIdx].isRandom) {
+            // Only pick from unlocked maps (skip index 0, and locked ones)
+            const unlockedMapIndices = this.availableMaps
+                .map((m, idx) => ({m, idx}))
+                .filter(({m, idx}) => !m.isRandom && (
+                    m.key === 'mapOne' ||
+                    (m.key === 'catsbyCorner' && localStorage.getItem('catsbyCornerUnlocked') === 'true') ||
+                    (m.key === 'robotMap' && localStorage.getItem('robotMapUnlocked') === 'true')
+                ))
+                .map(({idx}) => idx);
+            if (unlockedMapIndices.length > 0) {
+                mapIdx = unlockedMapIndices[Phaser.Math.Between(0, unlockedMapIndices.length - 1)];
+            } else {
+                mapIdx = 1; // fallback to Turnup's Trail
+            }
+        }
         // Epic transition effect
         const flash = this.add.rectangle(725, 475, 1450, 950, 0x66aaff, 0);
-        
         this.tweens.add({
             targets: flash,
             alpha: 1,
@@ -1275,9 +1442,13 @@ export class MainMenu extends Phaser.Scene {
                     alpha: 0,
                     duration: 300,
                     onComplete: () => {
-                        console.log('Transitioning to Game scene...');
-                        // Before starting the game, set the selected map in the registry
-                        this.registry.set('selectedMap', this.availableMaps[this.selectedMapIndex].data);
+                        // Set the selected character and map in the registry
+                        this.registry.set('selectedCharacter', this.characters[charIdx].key);
+                        // Also set the map key in the registry for per-map stats
+                        this.registry.set('selectedMap', this.availableMaps[mapIdx].data);
+                        if (this.availableMaps[mapIdx].key) {
+                            this.registry.set('selectedMapKey', this.availableMaps[mapIdx].key);
+                        }
                         this.scene.start('Game');
                     }
                 });

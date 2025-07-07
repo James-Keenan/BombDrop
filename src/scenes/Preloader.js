@@ -4,7 +4,49 @@ export class Preloader extends Phaser.Scene {
     }
 
     preload() {
+        // Pete's Street platform blocks
+        this.load.image('pinkBlock', 'assets/petes map/PinkBlock.png');
+        this.load.image('neonBlock', 'assets/petes map/Neonblock.png');
+        this.load.image('blueBlock', 'assets/petes map/blueBlock.png');
+        // Pete's map background and floor
+        this.load.image('petesMap', 'assets/petes map/petesMap.png');
+        this.load.image('petefloor', 'assets/petes map/petefloor.png');
+        // Pete the Possum (sprite sheet for both preview and in-game)
+        this.load.spritesheet(
+            'pete',
+            'assets/players/pete.png',
+            { frameWidth: 700, frameHeight: 1131 }
+        );
+        // Pluto the player (sprite sheet for both preview and in-game)
+        this.load.spritesheet(
+            'pluto',
+            'assets/players/Pluto.png',
+            { frameWidth: 430, frameHeight: 519 }
+        );
+        // Zara map assets for Gabbie's Grave
+        this.load.setPath('assets/zombie map');
+        this.load.image('zara background', 'zara background.png');
+        this.load.image('zara ground', 'zara ground.png');
+        this.load.image('zara platform', 'zara platform.png');
         this.load.setPath('assets');
+        // Grass platform for Gabbie's Grave
+        this.load.setPath('assets/zombie map');
+        this.load.image('grass', 'grass.png');
+        this.load.setPath('assets');
+        // Lock icon for locked characters
+        this.load.setPath('assets');
+        this.load.image('lock', 'lock.png');
+        // Catsby Corner map assets
+        this.load.setPath('assets/map photos/catsby corner');
+        this.load.image('catBackground', 'catBackground.png');
+        this.load.image('asset3', 'asset3.png');
+        this.load.image('catAsset', 'catAsset.png');
+        this.load.image('catfloor', 'catfloor.png');
+        this.load.setPath('assets');
+        this.load.setPath('assets');
+        // Load centered question mark images for random/unknown selection (after setPath)
+        this.load.image('question_mark', 'question_mark_centered.svg');
+        this.load.image('question_mark_map', 'question_mark_map_centered.svg');
         this.load.image('sky', "sky.png");
         this.load.image('ground', "platform.png");
         this.load.image('star', "star.png");
@@ -18,6 +60,9 @@ export class Preloader extends Phaser.Scene {
         // Load map preview images for map select UI
         this.load.image('MapOne', "map photos/MapOne.png");
         this.load.image('robotMap', "map photos/robotMap.png");
+        // Load Gabbie's Grave preview image (make sure the file exists at this path)
+        // Use Zara's background as the preview for Gabbie's Grave
+        this.load.image('gabbies_grave_preview', "zombie map/zara background.png");
 
         // Load dude spritesheet (32x48)
         this.load.spritesheet(
@@ -41,6 +86,13 @@ export class Preloader extends Phaser.Scene {
             'robot',
             "robot.png",
             { frameWidth: 560, frameHeight: 474 }
+        );
+
+        // Zara spritesheet (reduced frameWidth to help prevent bleeding)
+        this.load.spritesheet(
+            'zarazombie',
+            'players/Zarazombie.png',
+            { frameWidth: 534, frameHeight: 474 }
         );
     }
 
