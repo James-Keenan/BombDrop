@@ -348,8 +348,12 @@ export function showAchievements(scene, getProgress) {
     const scrollBarHeight = 540;
     const scrollBarY = 475;
     const scrollBarX = 1200;
-    const barBg = scene.add.rectangle(scrollBarX, scrollBarY, 18, scrollBarHeight, 0x333300, 0.7);
-    const bar = scene.add.rectangle(scrollBarX, scrollBarY - scrollBarHeight/2 + 40, 18, 80, 0xffcc00, 0.95).setInteractive();
+    // Thicker scroll bar for mobile and desktop thumb usability
+    const isMobile = window.innerWidth <= 768 || window.innerHeight <= 768 || ('ontouchstart' in window || navigator.maxTouchPoints > 0);
+    const barWidth = isMobile ? 48 : 32;
+    const barThumbHeight = isMobile ? 120 : 90;
+    const barBg = scene.add.rectangle(scrollBarX, scrollBarY, barWidth, scrollBarHeight, 0x333300, 0.7);
+    const bar = scene.add.rectangle(scrollBarX, scrollBarY - scrollBarHeight/2 + 40, barWidth, barThumbHeight, 0xffcc00, 0.95).setInteractive();
     bar.setOrigin(0.5, 0);
     let dragging = false;
     let dragOffsetY = 0;

@@ -1048,8 +1048,11 @@ export class MainMenu extends Phaser.Scene {
         const scrollBarHeight = 540;
         const scrollBarY = 475;
         const scrollBarX = 1200;
-        const barBg = this.add.rectangle(scrollBarX, scrollBarY, 18, scrollBarHeight, 0x003322, 0.7);
-        const bar = this.add.rectangle(scrollBarX, scrollBarY - scrollBarHeight/2 + 40, 18, 80, 0x44ff66, 0.95).setInteractive();
+        // Thicker scroll bar for mobile and desktop thumb usability
+        const barWidth = this.isMobile ? 64 : 40;
+        const barThumbHeight = this.isMobile ? 140 : 110;
+        const barBg = this.add.rectangle(scrollBarX, scrollBarY, barWidth, scrollBarHeight, 0x003322, 0.7);
+        const bar = this.add.rectangle(scrollBarX, scrollBarY - scrollBarHeight/2 + 40, barWidth, barThumbHeight, 0x44ff66, 0.95).setInteractive();
         bar.setOrigin(0.5, 0);
 
         // Scroll logic
