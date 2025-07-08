@@ -179,7 +179,22 @@ export class MainMenu extends Phaser.Scene {
             if (this.scale.isFullscreen) {
                 this.scale.stopFullscreen();
             } else {
-                this.scale.startFullscreen();
+                // On mobile, use the browser's fullscreen API for the canvas parent
+                if (this.isMobile) {
+                    const gameParent = document.getElementById('game') || this.sys.game.canvas.parentNode;
+                    if (gameParent && gameParent.requestFullscreen) {
+                        gameParent.requestFullscreen();
+                    } else if (gameParent && gameParent.webkitRequestFullscreen) {
+                        gameParent.webkitRequestFullscreen();
+                    } else if (gameParent && gameParent.msRequestFullscreen) {
+                        gameParent.msRequestFullscreen();
+                    } else {
+                        // fallback to Phaser's API if available
+                        this.scale.startFullscreen();
+                    }
+                } else {
+                    this.scale.startFullscreen();
+                }
                 // Increment fullscreen achievement only when entering fullscreen
                 if (window.incrementAchievement) {
                     window.incrementAchievement('fullscreen');
