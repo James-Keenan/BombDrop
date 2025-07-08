@@ -175,19 +175,19 @@ export class MainMenu extends Phaser.Scene {
         }).setOrigin(1, 0).setInteractive({ useHandCursor: true });
         btn.setDepth(1000);
         btn.on('pointerdown', () => {
-            // Toggle fullscreen using Phaser's API
+            // Toggle fullscreen using the most robust method for mobile
             if (this.scale.isFullscreen) {
                 this.scale.stopFullscreen();
             } else {
-                // On mobile, use the browser's fullscreen API for the canvas parent
+                // On mobile, use the browser's fullscreen API for the canvas itself (not parent)
                 if (this.isMobile) {
-                    const gameParent = document.getElementById('game') || this.sys.game.canvas.parentNode;
-                    if (gameParent && gameParent.requestFullscreen) {
-                        gameParent.requestFullscreen();
-                    } else if (gameParent && gameParent.webkitRequestFullscreen) {
-                        gameParent.webkitRequestFullscreen();
-                    } else if (gameParent && gameParent.msRequestFullscreen) {
-                        gameParent.msRequestFullscreen();
+                    const canvas = this.sys.game.canvas;
+                    if (canvas.requestFullscreen) {
+                        canvas.requestFullscreen();
+                    } else if (canvas.webkitRequestFullscreen) {
+                        canvas.webkitRequestFullscreen();
+                    } else if (canvas.msRequestFullscreen) {
+                        canvas.msRequestFullscreen();
                     } else {
                         // fallback to Phaser's API if available
                         this.scale.startFullscreen();
