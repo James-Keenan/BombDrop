@@ -32,11 +32,25 @@ export class MainMenu extends Phaser.Scene {
     constructor() {
         super('MainMenu');
         this.characters = [
-            { key: 'random', label: '???', previewKey: 'question_mark', previewFrame: 0, scale: 2.5, isRandom: true },
-            { key: 'dude', label: 'Turnup', previewKey: 'dude', previewFrame: 4, scale: 2.5 },
-            { key: 'cat', label: 'CATsby', previewKey: 'cat', previewFrame: 4, scale: 0.25 },
+            { key: 'random', label: '???', previewKey: 'question_mark', previewFrame: 0, scale: 2.5, isRandom: true, quotes: [
+                'Who will it be?',
+                'Mystery awaits!',
+                'Feeling lucky?'
+            ] },
+            { key: 'dude', label: 'Turnup', previewKey: 'dude', previewFrame: 4, scale: 2.5, quotes: [
+                'Let’s turn up the heat!',
+                'Ready to roll!',
+                'Stars are my jam!'
+            ] },
+            { key: 'cat', label: 'CATsby', previewKey: 'cat', previewFrame: 4, scale: 0.25, quotes: [
+                'Purrfection in motion!',
+                'Nine lives, one win!',
+                'Meow or never!'
+            ] },
             { key: 'robot', label: 'Tekno', previewKey: 'robot', previewFrame: 4, scale: 0.25, quotes: [
-                'Ctrl, Alt, Elite'
+                'Ctrl, Alt, Elite',
+                'System: Victory mode!',
+                'Beep boop, let’s win!'
             ] },
             { key: 'zarazombie', label: 'Gabbie', previewKey: 'zarazombie', previewFrame: 4, scale: 0.25, quotes: [
                 'Brains... or bombs?',
