@@ -47,15 +47,15 @@ export function showMapSelect(scene, maps, onSelect) {
             unlockMsg = "Reach level 2 on Turnup's Trail to unlock Catsby's Corner.";
         } else if (map.key === 'robotMap') {
             locked = !robotMapUnlocked;
-            unlockMsg = "Complete any level of Catsby's Corner to unlock Tekno's Robot Map.";
+            unlockMsg = "Reach level 5 on Catsby's Corner to unlock Tekno's Terminal.";
         } else if (map.key === 'gabbiesGrave') {
             const robotMapHighLevel = parseInt(localStorage.getItem('robotMap_highLevel') || '0', 10);
             locked = !robotMapUnlocked; // Or use a progress flag if available
-            unlockMsg = "Complete any level of Tekno's Robot Map to unlock Gabbie's Grave.";
+            unlockMsg = "Reach level 10 on Tekno's Terminal to unlock Gabbie's Grave.";
         } else if (map.key === 'peteStreet') {
             const gabbiesGraveUnlocked = localStorage.getItem('gabbiesGraveUnlocked') === 'true';
             locked = !gabbiesGraveUnlocked;
-            unlockMsg = "Complete any level of Gabbie's Grave to unlock Pete's Street.";
+            unlockMsg = "Reach level 15 on Gabbie's Grave to unlock Pete's Street.";
         } else if (map.key === 'mapOne') {
             locked = false; // Always unlocked
         }

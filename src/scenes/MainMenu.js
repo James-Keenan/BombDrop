@@ -10,6 +10,25 @@ import { getRandomQuote, showThoughtBubble } from '../ui/playerQuotes.js';
 import { showAchievements } from '../ui/achievements.js';
 
 export class MainMenu extends Phaser.Scene {
+    // --- DIFFICULTY MODES ---
+    static DIFFICULTY_LEVELS = [
+        { key: 'easy', label: 'EASY', color: '#66ff99' },
+        { key: 'normal', label: 'NORMAL', color: '#44aaff' },
+        { key: 'expert', label: 'EXPERT', color: '#ff4466' }
+    ];
+
+    getCurrentDifficultyIndex() {
+        const stored = localStorage.getItem('difficulty') || 'normal';
+        const idx = MainMenu.DIFFICULTY_LEVELS.findIndex(d => d.key === stored);
+        return idx === -1 ? 1 : idx;
+    }
+
+    setDifficulty(idx) {
+        const diff = MainMenu.DIFFICULTY_LEVELS[idx];
+        localStorage.setItem('difficulty', diff.key);
+        this.registry.set('difficulty', diff.key);
+        if (this.updateShowcase) this.updateShowcase();
+    }
     constructor() {
         super('MainMenu');
         this.characters = [
@@ -51,6 +70,22 @@ export class MainMenu extends Phaser.Scene {
     }
 
     create() {
+        // --- ACHIEVEMENT: Menu Explorer ---
+        if (window.incrementAchievement) {
+            window.incrementAchievement('menuOpened');
+        } else if (this.incrementAchievement) {
+            this.incrementAchievement('menuOpened');
+        }
+        // Only set default difficulty if not already set
+        let storedDiff = localStorage.getItem('difficulty');
+        if (!storedDiff || !['easy','normal','expert'].includes(storedDiff)) {
+            storedDiff = 'normal';
+            localStorage.setItem('difficulty', 'normal');
+            this.registry.set('difficulty', 'normal');
+        } else {
+            // Use whatever is already set
+            this.registry.set('difficulty', storedDiff);
+        }
         // Mobile detection
         this.isMobile = this.detectMobile();
         
@@ -112,7 +147,45 @@ export class MainMenu extends Phaser.Scene {
         // Add settings button (classic gear icon)
         this.createSettingsButton();
 
+        // Add fullscreen toggle button (PC & mobile)
+        this.createFullscreenButton();
+
         this.showingRules = false;
+    }
+    createFullscreenButton() {
+        // Place button near the left, but slightly more to the right
+        const x = 140, y = 60;
+        const btn = this.add.text(x, y, '⛶', {
+            fontFamily: 'Arial Black', fontSize: 48, color: '#ffe066', stroke: '#000', strokeThickness: 6,
+            backgroundColor: '#222', padding: { left: 16, right: 16, top: 8, bottom: 8 }
+        }).setOrigin(1, 0).setInteractive({ useHandCursor: true });
+        btn.setDepth(1000);
+        btn.on('pointerdown', () => {
+            // Toggle fullscreen using Phaser's API
+            if (this.scale.isFullscreen) {
+                this.scale.stopFullscreen();
+            } else {
+                this.scale.startFullscreen();
+                // Increment fullscreen achievement only when entering fullscreen
+                if (window.incrementAchievement) {
+                    window.incrementAchievement('fullscreen');
+                } else if (this.incrementAchievement) {
+                    this.incrementAchievement('fullscreen');
+                }
+            }
+        });
+        // Optional: Tooltip on hover
+        btn.on('pointerover', () => {
+            btn.setStyle({ color: '#fff', backgroundColor: '#444' });
+        });
+        btn.on('pointerout', () => {
+            btn.setStyle({ color: '#ffe066', backgroundColor: '#222' });
+        });
+        // On mobile, make button larger and more touch-friendly
+        if (this.isMobile) {
+            btn.setFontSize(64);
+            btn.setPadding({ left: 24, right: 24, top: 16, bottom: 16 });
+        }
     }
 
     createDynamicBackground() {
@@ -383,8 +456,8 @@ export class MainMenu extends Phaser.Scene {
 
 
 
-        // --- HOW TO PLAY and ACHIEVEMENTS BUTTONS ---
-        // Place Achievements and Settings in the top right, but HOW TO PLAY in the center below good luck
+        // --- ACHIEVEMENTS, HOW TO PLAY (question mark), SETTINGS BUTTONS ---
+        // Place Achievements, How To Play (question mark), and Settings in the top right
         const iconX = 1370;
         const iconY = 70;
         // Settings button (gear)
@@ -410,13 +483,12 @@ export class MainMenu extends Phaser.Scene {
         });
 
         // Achievements button (trophy icon)
-        const achievementsBtn = this.add.text(iconX - 70, iconY, '\ud83c\udfc6', {
+        const achievementsBtn = this.add.text(iconX - 140, iconY, '\ud83c\udfc6', {
             fontFamily: 'Arial Black', fontSize: 48, color: '#ffe066', stroke: '#b8860b', strokeThickness: 5
         }).setOrigin(0.5).setDepth(200).setInteractive({ useHandCursor: true });
         achievementsBtn.on('pointerdown', () => {
             showAchievements(this, (ach) => {
-                // Example: get progress from localStorage or registry
-                // You should expand this logic to track all achievement types
+                // ...existing code for achievement progress...
                 if (ach.type === 'stars') return parseInt(localStorage.getItem('totalStars') || '0', 10);
                 if (ach.type === 'bombs_avoided') return parseInt(localStorage.getItem('bombsAvoided') || '0', 10);
                 if (ach.type === 'level') return parseInt(localStorage.getItem('highestLevel') || '0', 10);
@@ -442,11 +514,41 @@ export class MainMenu extends Phaser.Scene {
         this.dynamicElements.push(settingsBtn);
         this.dynamicElements.push(achievementsBtn);
 
-        // HOW TO PLAY button (centered, below good luck message)
-        const howToPlayBtn = this.createDynamicButton(centerX, 410, 'HOW TO PLAY', '#44ff66', '#66ff99', () => {
+        // HOW TO PLAY button (question mark icon)
+        const howToPlayBtn = this.add.text(iconX - 70, iconY, '?', {
+            fontFamily: 'Arial Black', fontSize: 48, color: '#44ff66', stroke: '#000', strokeThickness: 6
+        }).setOrigin(0.5).setDepth(200).setInteractive({ useHandCursor: true });
+        howToPlayBtn.on('pointerdown', () => {
             this.showRules();
         });
+        howToPlayBtn.on('pointerover', () => { howToPlayBtn.setColor('#fff799'); });
+        howToPlayBtn.on('pointerout', () => { howToPlayBtn.setColor('#44ff66'); });
         this.dynamicElements.push(howToPlayBtn);
+
+        // DIFFICULTY button (centered, below good luck message)
+        const diffIdx = this.getCurrentDifficultyIndex();
+        const diff = MainMenu.DIFFICULTY_LEVELS[diffIdx];
+        const diffBtn = this.createDynamicButton(centerX, 410, `DIFFICULTY: ${diff.label}`, diff.color, '#fff799', () => {
+        // Always get the current difficulty index from storage, not closure
+        const currentIdx = this.getCurrentDifficultyIndex();
+        let nextIdx = (currentIdx + 1) % MainMenu.DIFFICULTY_LEVELS.length;
+        this.setDifficulty(nextIdx);
+        // Update button label and color immediately
+        const newDiff = MainMenu.DIFFICULTY_LEVELS[nextIdx];
+        // Find the buttonText child (Phaser.Text) and update it
+        const btnTextObj = diffBtn.list.find(child => child.setText && child.text && child.text.startsWith('DIFFICULTY:'));
+        if (btnTextObj) {
+            btnTextObj.setText(`DIFFICULTY: ${newDiff.label}`);
+            btnTextObj.setColor(newDiff.color);
+        }
+        // Update button border and glow color
+        const buttonBg = diffBtn.list.find(child => child.setStrokeStyle);
+        if (buttonBg) buttonBg.setStrokeStyle(4, newDiff.color);
+        const outerGlow = diffBtn.list.find(child => child.width && child.height && child.fillAlpha !== undefined);
+        if (outerGlow) outerGlow.setFillStyle(parseInt(newDiff.color.replace('#', '0x')), 0.2);
+    });
+    diffBtn.setScale(1.1, 1.1);
+    this.dynamicElements.push(diffBtn);
 
         // Place START GAME button at the bottom, styled green
         const startButton = this.createDynamicButton(centerX, 900, 'START GAME', '#44ff66', '#66ff99', () => {
@@ -510,6 +612,7 @@ export class MainMenu extends Phaser.Scene {
         const panelGlow = this.add.rectangle(centerX, y, panelWidth + 30, panelHeight + 30, 0x00ffd0, 0.10)
             .setDepth(9);
         this.showcaseGroup.add([panelGlow, panel]);
+
 
         // Corner bolts (arcade look)
         const boltColor = 0xffff66;

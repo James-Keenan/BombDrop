@@ -1,16 +1,17 @@
+
 import { Player } from '../Games Objects/player.js';
 import { MobileInputHandler } from '../mobileInputHandler.js';
 import { GameWon } from './GameWon.js';
+import { incrementAchievement, setAchievement, getAchievementProgress } from '../ui/achievements.js';
 
 export class Game extends Phaser.Scene {
     // --- ACHIEVEMENT PROGRESS HELPERS ---
     incrementAchievement(key, amount = 1) {
-        const prev = parseInt(localStorage.getItem(key) || '0', 10);
-        localStorage.setItem(key, prev + amount);
+        incrementAchievement(key, amount);
     }
 
     setAchievementFlag(key) {
-        localStorage.setItem(key, 'true');
+        setAchievement(key, 1);
     }
     constructor() {
         super('Game');
@@ -18,6 +19,96 @@ export class Game extends Phaser.Scene {
     }
 
     create() {
+        // --- DIFFICULTY SETTINGS ---
+        const difficulty = (this.registry.get('difficulty') || 'normal').toLowerCase();
+        console.log('[DEBUG] DIFFICULTY IN GAME:', difficulty);
+
+        // --- Difficulty Mode Achievement Tracking ---
+        if (difficulty === 'easy') this.incrementAchievement('gamesEasy');
+        else if (difficulty === 'normal') this.incrementAchievement('gamesNormal');
+        else if (difficulty === 'expert') this.incrementAchievement('gamesExpert');
+        else if (difficulty === 'master') this.incrementAchievement('gamesMaster');
+        // Show difficulty level to the user at game start
+        let difficultyLabel = 'NORMAL';
+        let difficultyColor = '#44aaff';
+        if (difficulty === 'easy') {
+            difficultyLabel = 'EASY';
+            difficultyColor = '#66ff99';
+        } else if (difficulty === 'expert') {
+            difficultyLabel = 'EXPERT';
+            difficultyColor = '#ff4466';
+        }
+        const diffText = this.add.text(725, 60, `Difficulty: ${difficultyLabel}`, {
+            fontFamily: 'Arial Black', fontSize: 44, color: difficultyColor, stroke: '#000', strokeThickness: 8, align: 'center',
+            shadow: { offsetX: 3, offsetY: 3, color: '#000', blur: 12, fill: true }
+        }).setOrigin(0.5).setDepth(1000);
+        // Fade out after 2.5 seconds
+        this.tweens.add({
+            targets: diffText,
+            alpha: 0,
+            duration: 900,
+            delay: 2500,
+            onComplete: () => diffText.destroy()
+        });
+        // Default values (Normal)
+        let bombSpeed = 220;
+        let bombGravity = 400;
+        let bombSpawnRate = 1800;
+        let startingLives = 3;
+        let extraLifeIncrement = 200;
+        let playerRegenRate = 1.0;
+        let easyBombSlowFactor = 1.0;
+        let easyStarMagnet = false;
+        let easyLifeRegenBoost = false;
+        let easyBarrierRechargeBoost = false;
+        if (difficulty === 'easy') {
+            bombSpeed = 80; // much slower bombs
+            bombGravity = 120; // much less gravity
+            bombSpawnRate = 3200; // bombs spawn much slower
+            startingLives = 3; // start with 3 lives on easy mode
+            extraLifeIncrement = 80; // extra lives are much cheaper
+            playerRegenRate = 2.2; // even faster regen
+            easyBombSlowFactor = 0.5; // used in releasedBomb
+            easyStarMagnet = true; // stronger star magnet
+            easyLifeRegenBoost = true;
+            easyBarrierRechargeBoost = true;
+            this.playerInvincible = true;
+            this.time.delayedCall(3000, () => { this.playerInvincible = false; });
+            let easyMsg = this.add.text(725, 120, 'Easy Mode: Invincibility for 3 seconds!', {
+                fontFamily: 'Arial Black', fontSize: 32, color: '#66ff99', stroke: '#000', strokeThickness: 6, align: 'center',
+                shadow: { offsetX: 2, offsetY: 2, color: '#000', blur: 8, fill: true }
+            }).setOrigin(0.5).setDepth(1000);
+            this.tweens.add({
+                targets: easyMsg,
+                alpha: 0,
+                duration: 1200,
+                delay: 2500,
+                onComplete: () => easyMsg.destroy()
+            });
+        } else if (difficulty === 'expert') {
+            bombSpeed = 350; // much faster bombs
+            bombGravity = 700; // much more gravity
+            bombSpawnRate = 900; // bombs spawn much faster
+            startingLives = 1; // start with 1 life on expert mode
+            extraLifeIncrement = 999999; // disables extra lives
+            playerRegenRate = 0.7; // slower regen
+            this.expertBombScale = 2.0; // Bombs are 2x bigger in expert mode
+        } else {
+            this.expertBombScale = 1.0;
+        }
+        // Use these values in your game logic below:
+        this.lives = startingLives;
+        this.extraLifeIncrement = extraLifeIncrement;
+        this.incrementIncrease = 50;
+        this.bombSpeed = bombSpeed;
+        this.bombGravity = bombGravity;
+        this.bombSpawnRate = bombSpawnRate;
+        this.playerRegenRate = playerRegenRate;
+        this.easyBombSlowFactor = easyBombSlowFactor;
+        this.easyStarMagnet = easyStarMagnet;
+        this.easyLifeRegenBoost = easyLifeRegenBoost;
+        this.easyBarrierRechargeBoost = easyBarrierRechargeBoost;
+        // (You may need to use these in bomb spawning, player, and regen logic)
         // Get selected map from registry, fallback to default if not set
         const selectedMap = this.registry.get('selectedMap');
         console.log('Game scene create() called');
@@ -180,7 +271,14 @@ export class Game extends Phaser.Scene {
         this.levelScoreIncrement = 500; // Points between levels
 
         // Lives system
-        this.lives = 3; // Starting lives
+        // Set lives based on difficulty
+        if (difficulty === 'expert') {
+            this.lives = 1;
+        } else if (difficulty === 'easy') {
+            this.lives = 3;
+        } else {
+            this.lives = 3;
+        }
         this.nextExtraLife = 200; // Score needed for next extra life
         this.extraLifeIncrement = 200; // Starting increment amount
         this.incrementIncrease = 50; // How much more each subsequent life costs
@@ -400,6 +498,8 @@ export class Game extends Phaser.Scene {
     }
 
     collectStar (player, star){
+        // --- ACHIEVEMENT: Star Collector ---
+        this.incrementAchievement('stars', this.player.getStarScoreValue()); // All-time star collection
         // Remove legacy star-based unlock tracking (now progress-based only)
         // Ensure selectedMapKey is always defined for this method
         const selectedMapKey = this.registry.get('selectedMapKey') || (this.registry.get('selectedMap') && this.registry.get('selectedMap').key);
@@ -448,6 +548,24 @@ export class Game extends Phaser.Scene {
             this.highScoreText.setText('high score: ' + this.highScore);
         }
 
+        // --- EASY MODE: Give bonus life on every 3rd star collected (gentle help for struggling players) ---
+        // Only allow bonus lives up to 5 total, and only if starting with 3 lives
+        if (this.easyLifeRegenBoost && this.lives < 5 && (this.score % 3 === 0)) {
+            this.lives++;
+            this.livesText.setText('Lives: ' + this.lives);
+            let bonusLifeText = this.add.text(725, 120, '+1 Life (Easy Mode)', {
+                fontFamily: 'Arial Black', fontSize: 28, color: '#66ff99', stroke: '#000', strokeThickness: 5, align: 'center',
+                shadow: { offsetX: 2, offsetY: 2, color: '#000', blur: 8, fill: true }
+            }).setOrigin(0.5).setDepth(1000);
+            this.tweens.add({
+                targets: bonusLifeText,
+                alpha: 0,
+                duration: 1200,
+                delay: 800,
+                onComplete: () => bonusLifeText.destroy()
+            });
+        }
+
         if (this.stars.countActive(true) === 0){
 
             // Level up when all stars are collected!
@@ -455,6 +573,8 @@ export class Game extends Phaser.Scene {
             this.currentLevel++;
             this.levelText.setText('Level: ' + this.currentLevel);
             console.log('New level:', this.currentLevel);
+            // --- ACHIEVEMENT: Level Up ---
+            this.incrementAchievement('level');
 
             // --- Always update mapOne_highLevel on Turnup's Trail ---
             if (selectedMapKey === 'mapOne') {
@@ -465,27 +585,29 @@ export class Game extends Phaser.Scene {
                 }
                 // --- UNLOCK Catsby's Corner if player has reached at least level 2 ---
                 if (this.currentLevel >= 2 && localStorage.getItem('catsbyCornerUnlocked') !== 'true') {
-                    localStorage.setItem('catsbyCornerUnlocked', 'true');
-                    newlyUnlockedMaps.push({ key: 'catsbyCorner', label: "Catsby's Corner", previewKey: 'catBackground' });
-                    console.log('[UNLOCK] Catsby\'s Corner unlocked!');
+                localStorage.setItem('catsbyCornerUnlocked', 'true');
+                newlyUnlockedMaps.push({ key: 'catsbyCorner', label: "Catsby's Corner", previewKey: 'catBackground' });
+                console.log('[UNLOCK] Catsby\'s Corner unlocked!');
                 }
             }
 
             // --- UNLOCK CHARACTERS AND MAPS BASED ON PROGRESS ---
             // Unlock Cat when any level of Catsby's Corner is completed
             if (selectedMapKey === 'catsbyCorner') {
-                if (localStorage.getItem('catUnlocked') !== 'true' || localStorage.getItem('catsbyUnlocked') !== 'true') {
-                    localStorage.setItem('catUnlocked', 'true');
-                    localStorage.setItem('catsbyUnlocked', 'true'); // For playerSelect.js compatibility
-                    newlyUnlockedCharacters.push({ key: 'cat', label: 'Cat' });
-                }
-                if (localStorage.getItem('robotMapUnlocked') !== 'true') {
-                    localStorage.setItem('robotMapUnlocked', 'true');
-                    newlyUnlockedMaps.push({ key: 'robotMap', label: "Tekno's Robot Map", previewKey: 'robotmap' });
-                }
-                if (newlyUnlockedCharacters.length > 0 || newlyUnlockedMaps.length > 0) {
-                    console.log('[UNLOCK] Cat and/or Tekno\'s Robot Map unlocked!');
-                }
+            if (localStorage.getItem('catUnlocked') !== 'true' || localStorage.getItem('catsbyUnlocked') !== 'true') {
+                localStorage.setItem('catUnlocked', 'true');
+                localStorage.setItem('catsbyUnlocked', 'true'); // For playerSelect.js compatibility
+                newlyUnlockedCharacters.push({ key: 'cat', label: 'Cat' });
+            }
+            // Tekno's Robot Map now unlocks at level 10 on Catsby's Corner
+            if (this.currentLevel >= 10 && localStorage.getItem('robotMapUnlocked') !== 'true') {
+                localStorage.setItem('robotMapUnlocked', 'true');
+                newlyUnlockedMaps.push({ key: 'robotMap', label: "Tekno's Robot Map", previewKey: 'robotmap' });
+                console.log('[UNLOCK] Tekno\'s Robot Map unlocked at level 10 on Catsby\'s Corner!');
+            }
+            if (newlyUnlockedCharacters.length > 0 || newlyUnlockedMaps.length > 0) {
+                console.log('[UNLOCK] Cat and/or Tekno\'s Robot Map unlocked!');
+            }
             }
             // Unlock Tekno when any level of Robot Map is completed
             if (selectedMapKey === 'robotMap') {
@@ -493,9 +615,11 @@ export class Game extends Phaser.Scene {
                     localStorage.setItem('robotUnlocked', 'true');
                     newlyUnlockedCharacters.push({ key: 'robot', label: 'Tekno' });
                 }
-                if (localStorage.getItem('gabbiesGraveUnlocked') !== 'true') {
+                // Only unlock Gabbie's Grave at level 10 or higher on Tekno's Terminal
+                if (this.currentLevel >= 10 && localStorage.getItem('gabbiesGraveUnlocked') !== 'true') {
                     localStorage.setItem('gabbiesGraveUnlocked', 'true');
                     newlyUnlockedMaps.push({ key: 'gabbiesGrave', label: "Gabbie's Grave", previewKey: 'sky' });
+                    console.log('[UNLOCK] Gabbie\'s Grave unlocked at level 10 on Tekno\'s Terminal!');
                 }
                 if (newlyUnlockedCharacters.length > 0 || newlyUnlockedMaps.length > 0) {
                     console.log('[UNLOCK] Tekno and/or Gabbie\'s Grave unlocked!');
@@ -503,17 +627,19 @@ export class Game extends Phaser.Scene {
             }
             // Unlock Gabbie when any level of Gabbie's Grave is completed
             if (selectedMapKey === 'gabbiesGrave') {
-                if (localStorage.getItem('zarazombieUnlocked') !== 'true') {
-                    localStorage.setItem('zarazombieUnlocked', 'true');
-                    newlyUnlockedCharacters.push({ key: 'zarazombie', label: 'Gabbie' });
-                }
-                if (localStorage.getItem('peteStreetUnlocked') !== 'true') {
-                    localStorage.setItem('peteStreetUnlocked', 'true');
-                    newlyUnlockedMaps.push({ key: 'peteStreet', label: "Pete's Street", previewKey: 'sky' });
-                }
-                if (newlyUnlockedCharacters.length > 0 || newlyUnlockedMaps.length > 0) {
-                    console.log('[UNLOCK] Gabbie and/or Pete\'s Street unlocked!');
-                }
+            if (localStorage.getItem('zarazombieUnlocked') !== 'true') {
+                localStorage.setItem('zarazombieUnlocked', 'true');
+                newlyUnlockedCharacters.push({ key: 'zarazombie', label: 'Gabbie' });
+            }
+            // Pete's Street now unlocks at level 15 on Gabbie's Grave
+            if (this.currentLevel >= 15 && localStorage.getItem('peteStreetUnlocked') !== 'true') {
+                localStorage.setItem('peteStreetUnlocked', 'true');
+                newlyUnlockedMaps.push({ key: 'peteStreet', label: "Pete's Street", previewKey: 'sky' });
+                console.log('[UNLOCK] Pete\'s Street unlocked at level 15 on Gabbie\'s Grave!');
+            }
+            if (newlyUnlockedCharacters.length > 0 || newlyUnlockedMaps.length > 0) {
+                console.log('[UNLOCK] Gabbie and/or Pete\'s Street unlocked!');
+            }
             }
             // Unlock Pluto when any level of Pete's Street is completed
             if (selectedMapKey === 'peteStreet') {
@@ -547,6 +673,11 @@ export class Game extends Phaser.Scene {
 
             // If max level (40) reached, trigger game won UI
             if (this.currentLevel > 40) {
+                // --- Difficulty Mode Win Achievement Tracking ---
+                if (difficulty === 'easy') this.incrementAchievement('winEasy');
+                else if (difficulty === 'normal') this.incrementAchievement('winNormal');
+                else if (difficulty === 'expert') this.incrementAchievement('winExpert');
+                else if (difficulty === 'master') this.incrementAchievement('winMaster');
                 console.log('[WIN DEBUG] Triggering GameWon scene!');
                 // --- ACHIEVEMENT: Win as character / on map ---
                 if (this._selectedCharacter === 'dude') this.incrementAchievement('dudeWin');
@@ -563,11 +694,11 @@ export class Game extends Phaser.Scene {
 
                 // --- ACHIEVEMENT: Master/expert checks (win with all, win on all) ---
                 const allMaps = ['mapOneWin','catsbyCornerWin','robotMapWin','gabbiesGraveWin','peteStreetWin'];
-                if (allMaps.every(k => parseInt(localStorage.getItem(k)||'0',10) > 0)) {
+                if (allMaps.every(k => getAchievementProgress(k) > 0)) {
                     this.setAchievementFlag('allMapsWin');
                 }
                 const allChars = ['dudeWin','catWin','robotWin','gabbieWin','plutoWin','peteWin'];
-                if (allChars.every(k => parseInt(localStorage.getItem(k)||'0',10) > 0)) {
+                if (allChars.every(k => getAchievementProgress(k) > 0)) {
                     this.setAchievementFlag('allCharactersWin');
                 }
                 if (this._selectedCharacter === 'dude') this.setAchievementFlag('turnupExpertWin');
@@ -630,7 +761,13 @@ export class Game extends Phaser.Scene {
             }
             
             // Award tokens for completing the level
-            const baseTokens = this.currentLevel <= 2 ? 1 : 2; // 1 token for levels 1-2, then 2 tokens
+            let baseTokens = 1;
+            if (this.easyBombSlowFactor < 1.0) {
+                // Easy mode: 2 tokens per level, 3 after level 7
+                baseTokens = this.currentLevel > 7 ? 3 : 2;
+            } else {
+                baseTokens = this.currentLevel <= 2 ? 1 : 2;
+            }
             const bonusTokens = this.player.getBonusTokensPerLevel(); // Bonus tokens from upgrade
             const tokensEarned = baseTokens + bonusTokens;
             console.log('Tokens earned:', tokensEarned, '(base:', baseTokens, '+ bonus:', bonusTokens, ')');
@@ -763,71 +900,68 @@ hitBomb (player, bomb){
         let newlyUnlockedCharacters = [];
         let newlyUnlockedMaps = [];
         // --- UNLOCK CHECKS FOR GAME OVER (always show if player qualifies, not just on first unlock) ---
+        // --- UNLOCK CHECKS FOR GAME OVER (only show if player actually unlocked something new) ---
         if (selectedMapKey === 'mapOne' && this.currentLevel >= 2) {
             if (localStorage.getItem('catsbyCornerUnlocked') !== 'true') {
                 localStorage.setItem('catsbyCornerUnlocked', 'true');
+                newlyUnlockedMaps.push({ key: 'catsbyCorner', label: "Catsby's Corner", previewKey: 'catBackground' });
                 console.log('[UNLOCK] (GameOver) Catsby\'s Corner unlocked!');
             }
-            newlyUnlockedMaps.push({ key: 'catsbyCorner', label: "Catsby's Corner", previewKey: 'catBackground' });
         }
         // Cat and Robot Map unlock
         if (selectedMapKey === 'catsbyCorner') {
             if (localStorage.getItem('catUnlocked') !== 'true' || localStorage.getItem('catsbyUnlocked') !== 'true') {
                 localStorage.setItem('catUnlocked', 'true');
                 localStorage.setItem('catsbyUnlocked', 'true');
+                newlyUnlockedCharacters.push({ key: 'cat', label: 'Cat' });
                 console.log('[UNLOCK] (GameOver) Cat unlocked!');
             }
-            newlyUnlockedCharacters.push({ key: 'cat', label: 'Cat' });
             if (localStorage.getItem('robotMapUnlocked') !== 'true') {
                 localStorage.setItem('robotMapUnlocked', 'true');
+                newlyUnlockedMaps.push({ key: 'robotMap', label: "Tekno's Robot Map", previewKey: 'robotmap' });
                 console.log('[UNLOCK] (GameOver) Tekno\'s Robot Map unlocked!');
             }
-            newlyUnlockedMaps.push({ key: 'robotMap', label: "Tekno's Robot Map", previewKey: 'robotmap' });
         }
         // Tekno and Gabbie's Grave unlock
         if (selectedMapKey === 'robotMap') {
             if (localStorage.getItem('robotUnlocked') !== 'true') {
                 localStorage.setItem('robotUnlocked', 'true');
+                newlyUnlockedCharacters.push({ key: 'robot', label: 'Tekno' });
                 console.log('[UNLOCK] (GameOver) Tekno unlocked!');
             }
-            newlyUnlockedCharacters.push({ key: 'robot', label: 'Tekno' });
-            if (localStorage.getItem('gabbiesGraveUnlocked') !== 'true') {
-                localStorage.setItem('gabbiesGraveUnlocked', 'true');
-                console.log('[UNLOCK] (GameOver) Gabbie\'s Grave unlocked!');
-            }
-            newlyUnlockedMaps.push({ key: 'gabbiesGrave', label: "Gabbie's Grave", previewKey: 'sky' });
+            // Gabbie's Grave unlock is handled ONLY at level 10+ in main unlock logic
         }
         // Gabbie and Pete's Street unlock
         if (selectedMapKey === 'gabbiesGrave') {
             if (localStorage.getItem('zarazombieUnlocked') !== 'true') {
                 localStorage.setItem('zarazombieUnlocked', 'true');
+                newlyUnlockedCharacters.push({ key: 'zarazombie', label: 'Gabbie' });
                 console.log('[UNLOCK] (GameOver) Gabbie unlocked!');
             }
-            newlyUnlockedCharacters.push({ key: 'zarazombie', label: 'Gabbie' });
             if (localStorage.getItem('peteStreetUnlocked') !== 'true') {
                 localStorage.setItem('peteStreetUnlocked', 'true');
+                newlyUnlockedMaps.push({ key: 'peteStreet', label: "Pete's Street", previewKey: 'sky' });
                 console.log('[UNLOCK] (GameOver) Pete\'s Street unlocked!');
             }
-            newlyUnlockedMaps.push({ key: 'peteStreet', label: "Pete's Street", previewKey: 'sky' });
         }
         // Pluto unlock
         if (selectedMapKey === 'peteStreet') {
             if (localStorage.getItem('plutoUnlocked') !== 'true') {
                 localStorage.setItem('plutoUnlocked', 'true');
+                newlyUnlockedCharacters.push({ key: 'pluto', label: 'Pluto' });
                 console.log('[UNLOCK] (GameOver) Pluto unlocked!');
             }
-            newlyUnlockedCharacters.push({ key: 'pluto', label: 'Pluto' });
         }
         // Pete unlock
         const allMaps = ['mapOneWin','catsbyCornerWin','robotMapWin','gabbiesGraveWin','peteStreetWin'];
         if (allMaps.every(k => parseInt(localStorage.getItem(k)||'0',10) > 0)) {
             if (localStorage.getItem('peteUnlocked') !== 'true') {
                 localStorage.setItem('peteUnlocked', 'true');
+                newlyUnlockedCharacters.push({ key: 'pete', label: 'Pete' });
                 console.log('[UNLOCK] (GameOver) Pete unlocked!');
             }
-            newlyUnlockedCharacters.push({ key: 'pete', label: 'Pete' });
         }
-        // Store all unlocks in registry arrays for GameOver/GameWon scenes (always show if player qualifies)
+        // Store all unlocks in registry arrays for GameOver/GameWon scenes (only show if player actually unlocked something new)
         if (newlyUnlockedCharacters.length > 0) {
             this.registry.set('unlockedCharacters', newlyUnlockedCharacters);
         } else {
@@ -895,15 +1029,30 @@ hitBomb (player, bomb){
         bomb.body.bounce.setTo(1, 1);
         bomb.body.friction.setTo(0);
         bomb.body.drag.setTo(0, 0);
-        
+
         // Fixed bomb speed - no level scaling
-        const baseSpeed = 200;
-        
-        // Apply slow bombs stat (permanent effect)
-        const slowFactor = this.player.getBombSlowFactor();
+        let baseSpeed = 200;
+        let baseGravity = 500; // Default gravity for bombs (adjust as needed)
+        let slowFactor = this.player.getBombSlowFactor();
+        // --- EASY MODE: apply extra slow factor ---
+        if (this.easyBombSlowFactor && this.easyBombSlowFactor < 1.0) {
+            baseSpeed = 90;
+            baseGravity = 160;
+            slowFactor = this.easyBombSlowFactor;
+        }
+        // --- EXPERT MODE: make bombs 2x bigger and much faster ---
+        let bombScale = 1.0;
+        if (this.expertBombScale && this.expertBombScale > 1.0 && !(this.easyBombSlowFactor && this.easyBombSlowFactor < 1.0)) {
+            bombScale = this.expertBombScale;
+            baseSpeed = 350;
+            baseGravity = 700;
+        }
+        bomb.setScale(bombScale);
         const finalBombSpeed = baseSpeed * slowFactor;
-        
+        const finalBombGravity = baseGravity * slowFactor;
+
         bomb.setVelocity(Phaser.Math.Between(-finalBombSpeed, finalBombSpeed), 20 * slowFactor);
+        bomb.body.setGravityY(finalBombGravity);
     }
 
     createMovingStars() {
@@ -1807,10 +1956,13 @@ hitBomb (player, bomb){
         const wasLifeRegenLocked = (abilityName === 'lifeRegen' && this.player.abilityRanks.lifeRegen === 0);
         
         if (this.player.upgradeAbility(abilityName)) {
+            // --- ACHIEVEMENT: Upgrades ---
+            this.incrementAchievement('upgrades'); // All-time upgrades
+            this.incrementAchievement('upgradesSingle'); // Upgrades in one game
+            this.incrementAchievement('upgradesTotal'); // For total upgrades (if tracked separately)
             if (wasLifeRegenLocked) {
                 this.lives++;
                 this.livesText.setText('Lives: ' + this.lives);
-                
                 const bonusLifeText = this.add.text(this.cameras.main.centerX, 150, 'LIFE REGEN UNLOCKED!\n+1 BONUS LIFE!', {
                     fontFamily: 'Arial Black',
                     fontSize: 24,
@@ -1819,7 +1971,6 @@ hitBomb (player, bomb){
                     strokeThickness: 3,
                     align: 'center'
                 }).setOrigin(0.5);
-                
                 this.tweens.add({
                     targets: bonusLifeText,
                     alpha: 0,
@@ -1830,7 +1981,6 @@ hitBomb (player, bomb){
                     }
                 });
             }
-            
             // Unlock mobile buttons when abilities are first purchased
             if (abilityName === 'fastFall' && this.player.abilityRanks.fastFall === 1) {
                 this.unlockMobileAbility('fast fall');
@@ -1844,7 +1994,6 @@ hitBomb (player, bomb){
             if (abilityName === 'sonicBoom' && this.player.abilityRanks.sonicBoom === 1) {
                 this.unlockMobileAbility('sonic');
             }
-            
             this.updateTokenUI();
             this.refreshUpgradeMenu();
             this.showUpgradeEffect(abilityName);

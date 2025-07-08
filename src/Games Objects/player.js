@@ -246,6 +246,12 @@ getCurrentSpeed() {
 
 jump(){
     console.log('Jump called - jumpRank:', this.abilityRanks.jump, 'maxJumps:', this.getMaxJumps(), 'jumpsRemaining:', this.jumpsRemaining, 'onGround:', this.body.blocked.down);
+    // --- ACHIEVEMENT: Jumper ---
+    if (window.incrementAchievement) {
+        window.incrementAchievement('jumps');
+    } else if (this.gameScene && this.gameScene.incrementAchievement) {
+        this.gameScene.incrementAchievement('jumps');
+    }
     
     if (this.body.blocked.down) {
         // Ground jump - always available
@@ -672,7 +678,8 @@ update() {
 
     // Get the bomb slow factor based on upgrade level (permanent stat)
     getBombSlowFactor() {
-        const slowLevels = [1.0, 0.85, 0.70, 0.55, 0.40, 0.25]; // Nerfed: bombs are less slow now
+        // Stronger slow effect
+        const slowLevels = [1.0, 0.7, 0.5, 0.35, 0.2, 0.1];
         return slowLevels[this.abilityRanks.slowBombs] || 1.0;
     }
 
@@ -740,41 +747,44 @@ getBarrierChargePercentage() {
 // Apply magnetic effect to stars (Star Magnet ability)
 applyStarMagnet(stars) {
     if (this.abilityRanks.starMagnet < 1) return;
-    
-    // Nerfed: reduced ranges and forces
-    const magnetRanges = [0, 80, 100, 130, 170, 220]; // Reduced from [0, 100, 135, 175, 225, 300]
-    const magnetForces = [0, 150, 180, 220, 280, 350]; // Reduced attraction force
-    
+
+    const magnetRanges = [0, 80, 100, 130, 170, 220];
+    const magnetForces = [0, 150, 180, 220, 280, 350];
+
     const magnetRange = magnetRanges[this.abilityRanks.starMagnet] || 80;
     const magnetForce = magnetForces[this.abilityRanks.starMagnet] || 150;
-    
+
     stars.children.entries.forEach(star => {
-        if (star.active) {
-            const distance = Phaser.Math.Distance.Between(this.x, this.y, star.x, star.y);
-            
-            if (distance < magnetRange && distance > 20) {
-                // Calculate direction from star to player
-                const angle = Phaser.Math.Angle.Between(star.x, star.y, this.x, this.y);
-                
-                // Apply magnetic force (stronger when closer)
-                const force = magnetForce * (1 - distance / magnetRange);
-                const velocityX = Math.cos(angle) * force;
-                const velocityY = Math.sin(angle) * force;
-                
-                star.setVelocity(velocityX, velocityY);
-                
-                // Visual effect
-                if (!star.magnetTint) {
-                    star.setTint(0xffff00);
-                    star.magnetTint = true;
-                    
-                    this.gameScene.time.delayedCall(300, () => {
-                        if (star.active) {
-                            star.setTint(0xffffff);
-                            star.magnetTint = false;
-                        }
-                    });
-                }
+        if (!star.active) return;
+        const distance = Phaser.Math.Distance.Between(this.x, this.y, star.x, star.y);
+
+        // If within range and not yet magnetized, start magnetizing
+        if (!star.isMagnetized && distance < magnetRange && distance > 20) {
+            star.isMagnetized = true;
+        }
+
+        // If star is magnetized, always pull it in, no matter how far away
+        if (star.isMagnetized) {
+            // If very close, snap to player to guarantee collection
+            if (distance < 32) {
+                star.x = this.x;
+                star.y = this.y;
+                star.setVelocity(0, 0);
+            } else {
+                // Use Phaser's moveToObject for direct movement
+                const speed = Math.max(600, magnetForce * 2 + distance * 2); // Always fast enough
+                this.gameScene.physics.moveToObject(star, this, speed);
+            }
+            // Visual effect
+            if (!star.magnetTint) {
+                star.setTint(0xffff00);
+                star.magnetTint = true;
+                this.gameScene.time.delayedCall(300, () => {
+                    if (star.active) {
+                        star.setTint(0xffffff);
+                        star.magnetTint = false;
+                    }
+                });
             }
         }
     });
@@ -783,6 +793,10 @@ applyStarMagnet(stars) {
 // Track star collection for EMP charging
 collectStar(starPoints = 9) {
         this.starPointsCollected += starPoints;
+        // Remove magnetized flag from any star that is collected
+        if (this.lastCollectedStar && this.lastCollectedStar.isMagnetized) {
+            this.lastCollectedStar.isMagnetized = false;
+        }
         if (this.empUnlocked && this.starPointsCollected >= this.starPointsNeededForEMP && !this.empAvailable) {
             this.empAvailable = true;
             this.starPointsCollected = 0; // Reset counter
@@ -831,18 +845,16 @@ collectStar(starPoints = 9) {
         // Life regen system - regenerate lives based on star points
         if (this.lifeRegenUnlocked) {
             this.lifeRegenPointsCollected += starPoints;
-            
             // Ensure we have a valid threshold to prevent infinite regeneration
             const pointsNeeded = Math.max(250, this.lifeRegenPointsNeededForLife);
-            
-            if (this.lifeRegenPointsCollected >= pointsNeeded) {
+            let safety = 0;
+            while (this.lifeRegenPointsCollected >= pointsNeeded && safety < 10) {
                 // Grant a new life
                 if (this.gameScene && this.gameScene.lives !== undefined) {
                     this.gameScene.lives++;
                     if (this.gameScene.livesText) {
                         this.gameScene.livesText.setText('Lives: ' + this.gameScene.lives);
                     }
-                    
                     // Show life regen notification
                     const lifeRegenText = this.gameScene.add.text(this.gameScene.cameras.main.centerX, 190, 'LIFE REGENERATED!', {
                         fontFamily: 'Arial Black',
@@ -851,7 +863,6 @@ collectStar(starPoints = 9) {
                         stroke: '#000000',
                         strokeThickness: 4
                     }).setOrigin(0.5);
-                    
                     this.gameScene.tweens.add({
                         targets: lifeRegenText,
                         alpha: 0,
@@ -862,8 +873,11 @@ collectStar(starPoints = 9) {
                         }
                     });
                 }
-                
-                // Reset points counter
+                this.lifeRegenPointsCollected -= pointsNeeded;
+                safety++;
+            }
+            // If something went wrong, don't let it loop forever
+            if (safety >= 10) {
                 this.lifeRegenPointsCollected = 0;
             }
         }

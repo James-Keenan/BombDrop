@@ -1,31 +1,41 @@
+// Utility: Force refresh of achievements UI (call this after updating achievements or when opening the menu)
+export function refreshAchievementsUI(scene) {
+    showAchievements(scene);
+}
+
+// (Tier helpers removed: no longer needed)
 // achievements.js
 // UI overlay for achievements in BombDrop
 // Exports a function to show the achievements UI and handle progress display
 
-// Difficulty levels
-const DIFFICULTY_LEVELS = [
-    { key: 'rookie', label: 'Rookie', color: '#66ff99' },
-    { key: 'normal', label: 'Normal', color: '#ffe066' },
-    { key: 'gifted', label: 'Gifted', color: '#66aaff' },
-    { key: 'expert', label: 'Expert', color: '#ff8844' },
-    { key: 'master', label: 'Master', color: '#ff4466' }
-];
+// No more difficulty levels; achievements are now grouped by type or theme only
+// (UI will show all achievements in a single scrollable list)
 
 // Base achievements (all will be expanded to 3 tiers)
+// Expanded with more UI/interaction achievements
 const BASE_ACHIEVEMENTS = [
+    // --- Difficulty Mode Achievements ---
+    { key: 'gamesEasy', baseName: 'Easy Mode Player', baseDesc: 'Play games on Easy mode.', type: 'gamesEasy', goals: [1, 10, 50], difficulties: ['rookie', 'normal', 'gifted'] },
+    { key: 'gamesNormal', baseName: 'Normal Mode Player', baseDesc: 'Play games on Normal mode.', type: 'gamesNormal', goals: [1, 10, 50], difficulties: ['rookie', 'normal', 'gifted'] },
+    { key: 'gamesExpert', baseName: 'Expert Mode Player', baseDesc: 'Play games on Expert mode.', type: 'gamesExpert', goals: [1, 5, 20], difficulties: ['rookie', 'normal', 'gifted'] },
+    { key: 'gamesMaster', baseName: 'Master Mode Player', baseDesc: 'Play games on Master mode.', type: 'gamesMaster', goals: [1, 3, 10], difficulties: ['normal', 'gifted', 'master'] },
+    { key: 'winEasy', baseName: 'Easy Mode Victor', baseDesc: 'Win games on Easy mode.', type: 'winEasy', goals: [1, 5, 20], difficulties: ['rookie', 'normal', 'gifted'] },
+    { key: 'winNormal', baseName: 'Normal Mode Victor', baseDesc: 'Win games on Normal mode.', type: 'winNormal', goals: [1, 5, 20], difficulties: ['rookie', 'normal', 'gifted'] },
+    { key: 'winExpert', baseName: 'Expert Mode Victor', baseDesc: 'Win games on Expert mode.', type: 'winExpert', goals: [1, 3, 10], difficulties: ['normal', 'gifted', 'expert'] },
+    { key: 'winMaster', baseName: 'Master Mode Victor', baseDesc: 'Win games on Master mode.', type: 'winMaster', goals: [1, 2, 5], difficulties: ['gifted', 'expert', 'master'] },
     // Rookie (20)
-    { key: 'stars', baseName: 'Star Collector', baseDesc: 'Collect stars.', type: 'stars', goals: [100, 500, 2000], difficulties: ['rookie', 'normal', 'gifted'] },
-    { key: 'bombs_avoided', baseName: 'Bomb Dodger', baseDesc: 'Survive bombs.', type: 'bombs_avoided', goals: [10, 100, 250], difficulties: ['rookie', 'normal', 'gifted'] },
-    { key: 'level', baseName: 'Level Up', baseDesc: 'Reach levels.', type: 'level', goals: [1, 10, 25], difficulties: ['rookie', 'normal', 'gifted'] },
-    { key: 'deaths', baseName: 'Fallen', baseDesc: 'Lose lives.', type: 'deaths', goals: [10, 50, 100], difficulties: ['rookie', 'normal', 'gifted'] },
-    { key: 'wins', baseName: 'Victor', baseDesc: 'Win games.', type: 'wins', goals: [1, 5, 10], difficulties: ['rookie', 'normal', 'gifted'] },
-    { key: 'upgrades', baseName: 'Upgrade Buyer', baseDesc: 'Buy upgrades.', type: 'upgrades', goals: [5, 10, 20], difficulties: ['rookie', 'normal', 'gifted'] },
-    { key: 'tokens', baseName: 'Token Collector', baseDesc: 'Collect tokens.', type: 'tokens', goals: [10, 50, 100], difficulties: ['rookie', 'normal', 'gifted'] },
-    { key: 'barrier', baseName: 'Barrier User', baseDesc: 'Use Barrier.', type: 'barrier', goals: [5, 10, 25], difficulties: ['rookie', 'normal', 'gifted'] },
-    { key: 'emp', baseName: 'EMP User', baseDesc: 'Use EMP.', type: 'emp', goals: [5, 10, 25], difficulties: ['rookie', 'normal', 'gifted'] },
-    { key: 'sonic', baseName: 'Sonic Boomer', baseDesc: 'Use Sonic Boom.', type: 'sonic', goals: [5, 10, 25], difficulties: ['rookie', 'normal', 'gifted'] },
-    { key: 'platformDrop', baseName: 'Platform Dropper', baseDesc: 'Drop through platforms.', type: 'platformDrop', goals: [10, 50, 100], difficulties: ['rookie', 'normal', 'gifted'] },
-    { key: 'zeroGravity', baseName: 'Zero Gravity', baseDesc: 'Use Zero Gravity.', type: 'zeroGravity', goals: [10, 20, 50], difficulties: ['rookie', 'normal', 'gifted'] },
+    { key: 'stars', baseName: 'Star Collector', baseDesc: 'Collect stars.', type: 'stars', goals: [1000, 5000, 20000], difficulties: ['rookie', 'normal', 'gifted'] },
+    { key: 'bombs_avoided', baseName: 'Bomb Dodger', baseDesc: 'Survive bombs.', type: 'bombs_avoided', goals: [100, 1000, 2500], difficulties: ['rookie', 'normal', 'gifted'] },
+    { key: 'level', baseName: 'Level Up', baseDesc: 'Reach levels.', type: 'level', goals: [10, 50, 100], difficulties: ['rookie', 'normal', 'gifted'] },
+    { key: 'deaths', baseName: 'Fallen', baseDesc: 'Lose lives.', type: 'deaths', goals: [100, 500, 1000], difficulties: ['rookie', 'normal', 'gifted'] },
+    { key: 'wins', baseName: 'Victor', baseDesc: 'Win games.', type: 'wins', goals: [10, 50, 100], difficulties: ['rookie', 'normal', 'gifted'] },
+    { key: 'upgrades', baseName: 'Upgrade Buyer', baseDesc: 'Buy upgrades.', type: 'upgrades', goals: [50, 100, 200], difficulties: ['rookie', 'normal', 'gifted'] },
+    { key: 'tokens', baseName: 'Token Collector', baseDesc: 'Collect tokens.', type: 'tokens', goals: [1000, 5000, 10000], difficulties: ['rookie', 'normal', 'gifted'] },
+    { key: 'barrier', baseName: 'Barrier User', baseDesc: 'Use Barrier.', type: 'barrier', goals: [50, 100, 250], difficulties: ['rookie', 'normal', 'gifted'] },
+    { key: 'emp', baseName: 'EMP User', baseDesc: 'Use EMP.', type: 'emp', goals: [50, 100, 250], difficulties: ['rookie', 'normal', 'gifted'] },
+    { key: 'sonic', baseName: 'Sonic Boomer', baseDesc: 'Use Sonic Boom.', type: 'sonic', goals: [50, 100, 250], difficulties: ['rookie', 'normal', 'gifted'] },
+    { key: 'platformDrop', baseName: 'Platform Dropper', baseDesc: 'Drop through platforms.', type: 'platformDrop', goals: [100, 500, 1000], difficulties: ['rookie', 'normal', 'gifted'] },
+    { key: 'zeroGravity', baseName: 'Zero Gravity', baseDesc: 'Use Zero Gravity.', type: 'zeroGravity', goals: [100, 200, 500], difficulties: ['rookie', 'normal', 'gifted'] },
     { key: 'catsbyUnlocked', baseName: 'Unlock CATsby', baseDesc: 'Unlock CATsby as a playable character.', type: 'catsbyUnlocked', goals: [1], difficulties: ['rookie', 'normal', 'gifted'] },
     { key: 'robotUnlocked', baseName: 'Unlock Tekno', baseDesc: 'Unlock Tekno as a playable character.', type: 'robotUnlocked', goals: [1], difficulties: ['rookie', 'normal', 'gifted'] },
     // Play as each character (rookie tier)
@@ -42,7 +52,14 @@ const BASE_ACHIEVEMENTS = [
     { key: 'gabbieWin', baseName: 'Gabbie Winner', baseDesc: 'Win as Gabbie.', type: 'gabbieWin', goals: [1, 3, 7], difficulties: ['normal', 'gifted', 'expert'] },
     { key: 'plutoWin', baseName: 'Pluto Winner', baseDesc: 'Win as Pluto.', type: 'plutoWin', goals: [1, 3, 7], difficulties: ['normal', 'gifted', 'expert'] },
     { key: 'peteWin', baseName: 'Pete Winner', baseDesc: 'Win as Pete.', type: 'peteWin', goals: [1, 3, 7], difficulties: ['normal', 'gifted', 'expert'] },
-    // Play on each map (rookie tier)
+    // --- UI/Interaction Achievements ---
+    { key: 'openAchievements', baseName: 'Achievement Hunter', baseDesc: 'Open the Achievements screen.', type: 'openAchievements', goals: [1, 5, 20], difficulties: [] },
+    { key: 'openSettings', baseName: 'Settings Explorer', baseDesc: 'Open the Settings screen.', type: 'openSettings', goals: [1, 5, 20], difficulties: [] },
+    { key: 'changeTheme', baseName: 'Theme Changer', baseDesc: 'Change the game theme.', type: 'changeTheme', goals: [1, 3, 10], difficulties: [] },
+    { key: 'muteMusic', baseName: 'Silence is Golden', baseDesc: 'Mute the music.', type: 'muteMusic', goals: [1], difficulties: [] },
+    { key: 'muteSFX', baseName: 'Quiet Please', baseDesc: 'Mute the sound effects.', type: 'muteSFX', goals: [1], difficulties: [] },
+    { key: 'fullscreen', baseName: 'Full Immersion', baseDesc: 'Enter fullscreen mode (PC or mobile).', type: 'fullscreen', goals: [1, 3, 10], difficulties: [] },
+    { key: 'visitCredits', baseName: 'Credit Where Due', baseDesc: 'Open the Credits screen.', type: 'visitCredits', goals: [1], difficulties: [] },
     { key: 'mapOnePlayed', baseName: "Turnup's Trail", baseDesc: 'Play on Turnup\'s Trail.', type: 'mapOnePlayed', goals: [1, 5, 15], difficulties: ['rookie', 'normal', 'gifted'] },
     { key: 'catsbyCornerPlayed', baseName: "Catsby's Corner", baseDesc: 'Play on Catsby\'s Corner.', type: 'catsbyCornerPlayed', goals: [1, 5, 15], difficulties: ['rookie', 'normal', 'gifted'] },
     { key: 'robotMapPlayed', baseName: "Tekno's Terminal", baseDesc: 'Play on Tekno\'s Terminal.', type: 'robotMapPlayed', goals: [1, 5, 15], difficulties: ['rookie', 'normal', 'gifted'] },
@@ -73,8 +90,7 @@ const BASE_ACHIEVEMENTS = [
     { key: 'robot_play', baseName: 'Tekno Main', baseDesc: 'Play as Tekno.', type: 'robotPlayed', goals: [1, 5, 15], difficulties: ['normal', 'gifted', 'expert'] },
     // Gabbie (formerly Zara) win achievement
     { key: 'gabbieWin', baseName: 'Gabbie Winner', baseDesc: 'Win as Gabbie.', type: 'gabbieWin', goals: [1, 3, 7], difficulties: ['normal', 'gifted', 'expert'] },
-    { key: 'cat_win', baseName: 'CATsby Winner', baseDesc: 'Win as CATsby.', type: 'catWins', goals: [1, 3, 7], difficulties: ['normal', 'gifted', 'expert'] },
-    { key: 'robot_win', baseName: 'Tekno Winner', baseDesc: 'Win as Tekno.', type: 'robotWins', goals: [1, 3, 7], difficulties: ['normal', 'gifted', 'expert'] },
+    // Removed duplicate/incorrect catWins and robotWins achievements (use catWin and robotWin only)
     { key: 'multi_play', baseName: 'Multiplayer', baseDesc: 'Play a multiplayer game.', type: 'multiplayer', goals: [1, 5, 10], difficulties: ['normal', 'gifted', 'expert'] },
     { key: 'coop_play', baseName: 'Co-op', baseDesc: 'Play a co-op game.', type: 'coop', goals: [1, 5, 10], difficulties: ['normal', 'gifted', 'expert'] },
     { key: 'map_explore', baseName: 'Explorer', baseDesc: 'Play on every map.', type: 'mapsExplored', goals: [2, 4, 6], difficulties: ['normal', 'gifted', 'expert'] },
@@ -83,6 +99,10 @@ const BASE_ACHIEVEMENTS = [
 
     // Gifted (20)
     { key: 'star_200', baseName: 'Star Hoarder', baseDesc: 'Collect stars in total.', type: 'starsTotal', goals: [50, 100, 200], difficulties: ['gifted', 'expert', 'master'] },
+    // All-time star collection achievement (5000 stars)
+    { key: 'star_legend', baseName: 'Star Legend', baseDesc: 'Collect 5000 stars all-time.', type: 'starsTotal', goals: [5000], difficulties: [] },
+    // All-time star collection achievement (5000 stars)
+    { key: 'star_5000_total', baseName: 'Star Legend', baseDesc: 'Collect 5000 stars all-time.', type: 'starsTotal', goals: [5000], difficulties: [] },
     { key: 'bomb_50', baseName: 'Bomb Veteran', baseDesc: 'Survive bombs in total.', type: 'bombsTotal', goals: [20, 35, 50], difficulties: ['gifted', 'expert', 'master'] },
     { key: 'death_50', baseName: 'Fallen Veteran', baseDesc: 'Lose lives in total.', type: 'deathsTotal', goals: [20, 35, 50], difficulties: ['gifted', 'expert', 'master'] },
     { key: 'win_50', baseName: 'Winning Streak', baseDesc: 'Win games in total.', type: 'winsTotal', goals: [10, 25, 50], difficulties: ['gifted', 'expert', 'master'] },
@@ -133,40 +153,104 @@ const SPECIAL_ACHIEVEMENTS = [
     { key: 'speedrunner', name: 'Speedrunner', desc: 'Win a game in under 2 minutes.', goal: 1, type: 'speedrunner', difficulty: 'master' }
 ];
 
-// Roman numerals for tiers
-const ROMAN = ['I', 'II', 'III'];
-
-// Expand base achievements to 3 tiers (where applicable) and add special achievements
+// Remove tiers: each achievement is now a single, high-value goal
 const ACHIEVEMENTS = [
-    ...BASE_ACHIEVEMENTS.flatMap(base => {
-        // Only show the next uncompleted tier for each achievement type
-        let progress = 0;
-        let foundIncomplete = false;
-        return base.goals.map((goal, i) => {
-            return {
-                key: `${base.key}_tier${i+1}`,
-                name: `${base.baseName} ${ROMAN[i]}`,
-                desc: `${base.baseDesc} ${goal === 1 ? '' : `(${goal})`}`,
-                goal,
-                type: base.type,
-                difficulty: base.difficulties[i] || base.difficulties[base.difficulties.length-1],
-                tierIndex: i
-            };
-        });
-    }).filter((ach, idx, arr) => {
-        // Only show the first incomplete tier for each achievement type, or all completed tiers
-        const prevTiers = arr.filter(a => a.type === ach.type && a.tierIndex < ach.tierIndex);
-        // If any previous tier is not complete, don't show this tier
-        if (ach.tierIndex > 0 && prevTiers.some(pt => !window.getProgress || (window.getProgress(pt) < pt.goal))) {
-            return false;
-        }
-        // If this tier is not complete, show it; if complete, show it as well
-        return true;
+    ...BASE_ACHIEVEMENTS.map(base => {
+        // Use the highest goal value for each achievement
+        const goal = Math.max(...base.goals);
+        return {
+            key: base.key,
+            name: base.baseName,
+            desc: `${base.baseDesc} (${goal})`,
+            goal,
+            type: base.type
+        };
     }),
     ...SPECIAL_ACHIEVEMENTS
 ];
 
+// --- Achievement Progress Storage and Retrieval ---
+const ACHIEVEMENT_STORAGE_KEY = 'bombdrop_achievements';
+
+// Returns the achievement progress object from localStorage, or initializes it if missing
+function loadAchievementProgress() {
+    let data = {};
+    try {
+        data = JSON.parse(localStorage.getItem(ACHIEVEMENT_STORAGE_KEY)) || {};
+    } catch (e) {
+        data = {};
+    }
+    return data;
+}
+
+// Saves the achievement progress object to localStorage
+function saveAchievementProgress(progress) {
+    localStorage.setItem(ACHIEVEMENT_STORAGE_KEY, JSON.stringify(progress));
+}
+
+// Increments progress for a given achievement type by a value (default 1)
+export function incrementAchievement(type, value = 1) {
+    const progress = loadAchievementProgress();
+    if (!progress[type]) progress[type] = 0;
+    progress[type] += value;
+    saveAchievementProgress(progress);
+}
+
+// Sets progress for a given achievement type to a specific value (for one-time/flag achievements)
+export function setAchievement(type, value = 1) {
+    const progress = loadAchievementProgress();
+    progress[type] = value;
+    saveAchievementProgress(progress);
+}
+
+// Gets progress for a given achievement type
+export function getAchievementProgress(type) {
+    const progress = loadAchievementProgress();
+    return progress[type] || 0;
+}
+
+// Global getter for UI and filtering logic
+window.getProgress = function(ach) {
+    // Accepts either {type} or string
+    const type = ach && ach.type ? ach.type : ach;
+    return getAchievementProgress(type);
+};
+
+// Optionally, clear all achievements (for debug/reset)
+export function clearAllAchievements() {
+    localStorage.removeItem(ACHIEVEMENT_STORAGE_KEY);
+}
+
+// Always use a fresh getter to ensure UI is up-to-date
 export function showAchievements(scene, getProgress) {
+    // Always use a fresh getter that reads from localStorage, regardless of what is passed in
+    getProgress = (ach) => {
+        const type = ach && ach.type ? ach.type : ach;
+        let data = {};
+        try {
+            data = JSON.parse(localStorage.getItem(ACHIEVEMENT_STORAGE_KEY)) || {};
+        } catch (e) { data = {}; }
+        return data[type] || 0;
+    };
+    // Increment "openAchievements" achievement every time achievements UI is opened
+    try { incrementAchievement('openAchievements'); } catch (e) {}
+    // Debug: Log scene and sample progress for troubleshooting
+    if (typeof console !== 'undefined') {
+        console.log('[Achievements] showAchievements called for scene:', scene && scene.scene && scene.scene.key);
+        // Log a few sample achievements to verify progress
+        console.log('[Achievements] Sample progress:', {
+            gamesExpert: getProgress({type: 'gamesExpert'}),
+            winExpert: getProgress({type: 'winExpert'}),
+            stars: getProgress({type: 'stars'})
+        });
+    }
+    // --- Force refresh on scene wake (for Phaser 3) ---
+    if (scene && scene.events && typeof scene.events.once === 'function') {
+        scene.events.once('wake', () => {
+            showAchievements(scene, getProgress);
+        });
+    }
+    // --- Always call refreshAchievementsUI(this) in your main menu's achievements button handler ---
     // Clear existing content
     scene.children.removeAll();
     scene.particles = [];
@@ -214,45 +298,49 @@ export function showAchievements(scene, getProgress) {
     maskShape.fillRect(275, 205, 900, 540);
     const mask = maskShape.createGeometryMask();
 
-    // Render achievements grouped by difficulty
+    // Render all achievements in a single scrollable list
     const textContainer = scene.add.container(275, 205);
     let y = 0;
-    DIFFICULTY_LEVELS.forEach(diff => {
-        const header = scene.add.text(0, y, diff.label, {
-            fontFamily: 'Arial Black', fontSize: 44, color: diff.color, stroke: '#000', strokeThickness: 6
+    ACHIEVEMENTS.forEach((ach, i) => {
+        const progress = (typeof getProgress === 'function') ? getProgress(ach) : 0;
+        const percent = Math.min(1, progress / ach.goal);
+        const isComplete = percent >= 1;
+        const achBox = scene.add.rectangle(450, y + 40, 860, 70, isComplete ? 0x44ff66 : 0x333355, isComplete ? 0.18 : 0.10).setStrokeStyle(2, isComplete ? 0xffcc00 : 0x8888aa);
+        const name = scene.add.text(60, y + 10, ach.name, {
+            fontFamily: 'Arial Black', fontSize: 32, color: isComplete ? '#ffe066' : '#fff', stroke: '#000', strokeThickness: 4
         });
-        textContainer.add(header);
-        y += 54;
-        ACHIEVEMENTS.filter(a => a.difficulty === diff.key).forEach((ach, i) => {
-            const progress = getProgress(ach);
-            const percent = Math.min(1, progress / ach.goal);
-            const isComplete = percent >= 1;
-            const achBox = scene.add.rectangle(450, y + 40, 860, 70, isComplete ? 0x44ff66 : 0x333355, isComplete ? 0.18 : 0.10).setStrokeStyle(2, isComplete ? 0xffcc00 : 0x8888aa);
-            const name = scene.add.text(60, y + 10, ach.name, {
-                fontFamily: 'Arial Black', fontSize: 32, color: isComplete ? '#ffe066' : '#fff', stroke: '#000', strokeThickness: 4
-            });
-            const desc = scene.add.text(60, y + 44, ach.desc, {
-                fontFamily: 'Arial', fontSize: 22, color: '#cccccc', stroke: '#000', strokeThickness: 2
-            });
-            if (isComplete) {
-                // Show complete text instead of progress bar
-                const completeText = scene.add.text(700, y + 45, 'Complete!', {
-                    fontFamily: 'Arial Black', fontSize: 26, color: '#44ff66', stroke: '#000', strokeThickness: 4
-                }).setOrigin(0.5);
-                textContainer.add([achBox, name, desc, completeText]);
-            } else {
-                // Progress bar
-                const barBg = scene.add.rectangle(700, y + 45, 260, 18, 0x222222, 0.7);
-                const bar = scene.add.rectangle(570, y + 45, Math.max(8, 260 * percent), 18, 0xffcc00, 0.7).setOrigin(0, 0.5);
-                // Progress text stays to the left of the bar
-                const progressText = scene.add.text(570 - 10, y + 45, `${Math.floor(progress)}/${ach.goal}`, {
-                    fontFamily: 'Arial Black', fontSize: 20, color: '#fff', stroke: '#000', strokeThickness: 3, align: 'right'
-                }).setOrigin(1, 0.5);
-                textContainer.add([achBox, name, desc, barBg, bar, progressText]);
-            }
-            y += 80;
+        const desc = scene.add.text(60, y + 44, ach.desc, {
+            fontFamily: 'Arial', fontSize: 22, color: '#cccccc', stroke: '#000', strokeThickness: 2
         });
-        y += 20;
+        // --- Show achievement description on click ---
+        [achBox, name, desc].forEach(obj => {
+            obj.setInteractive({ useHandCursor: true });
+            obj.on('pointerdown', () => {
+                // Remove any previous popup
+                if (scene._achPopup) scene._achPopup.destroy();
+                scene._achPopup = scene.add.text(725, 700, `How to unlock: ${ach.desc}`, {
+                    fontFamily: 'Arial Black', fontSize: 32, color: '#fff', stroke: '#000', strokeThickness: 6, align: 'center', backgroundColor: '#222', padding: { left: 20, right: 20, top: 10, bottom: 10 }
+                }).setOrigin(0.5).setDepth(9999);
+                scene.time.delayedCall(3500, () => { if (scene._achPopup) { scene._achPopup.destroy(); scene._achPopup = null; } }, [], scene);
+            });
+        });
+        if (isComplete) {
+            // Show complete text instead of progress bar
+            const completeText = scene.add.text(700, y + 45, 'Complete!', {
+                fontFamily: 'Arial Black', fontSize: 26, color: '#44ff66', stroke: '#000', strokeThickness: 4
+            }).setOrigin(0.5);
+            textContainer.add([achBox, name, desc, completeText]);
+        } else {
+            // Progress bar
+            const barBg = scene.add.rectangle(700, y + 45, 260, 18, 0x222222, 0.7);
+            const bar = scene.add.rectangle(570, y + 45, Math.max(8, 260 * percent), 18, 0xffcc00, 0.7).setOrigin(0, 0.5);
+            // Progress text stays to the left of the bar
+            const progressText = scene.add.text(570 - 10, y + 45, `${Math.floor(progress)}/${ach.goal}`, {
+                fontFamily: 'Arial Black', fontSize: 20, color: '#fff', stroke: '#000', strokeThickness: 3, align: 'right'
+            }).setOrigin(1, 0.5);
+            textContainer.add([achBox, name, desc, barBg, bar, progressText]);
+        }
+        y += 80;
     });
     textContainer.setMask(mask);
 
@@ -277,16 +365,16 @@ export function showAchievements(scene, getProgress) {
             textContainer.y = 205 - scrollPercent * maxScroll;
         }
     });
-    // Mouse wheel scroll
+    // Mouse wheel scroll (slower)
     scene.input.on('wheel', (pointer, gameObjects, deltaX, deltaY) => {
-        let scroll = (bar.y - (scrollBarY - scrollBarHeight/2)) + deltaY * 0.2;
+        let scroll = (bar.y - (scrollBarY - scrollBarHeight/2)) + deltaY * 0.08; // slower scroll
         scroll = Math.max(0, Math.min(scrollBarHeight - bar.height, scroll));
         bar.y = scrollBarY - scrollBarHeight/2 + scroll;
         const scrollPercent = scroll / (scrollBarHeight - bar.height);
         const maxScroll = Math.max(0, y - 540);
         textContainer.y = 205 - scrollPercent * maxScroll;
     });
-    // Touch scroll
+    // Touch scroll (slower)
     let lastPointerY = null;
     scrollArea.setInteractive();
     scrollArea.on('pointerdown', (pointer) => { lastPointerY = pointer.y; });
@@ -295,7 +383,7 @@ export function showAchievements(scene, getProgress) {
         if (lastPointerY !== null) {
             let dy = pointer.y - lastPointerY;
             lastPointerY = pointer.y;
-            let scroll = (bar.y - (scrollBarY - scrollBarHeight/2)) - dy;
+            let scroll = (bar.y - (scrollBarY - scrollBarHeight/2)) - dy * 0.4; // slower scroll
             scroll = Math.max(0, Math.min(scrollBarHeight - bar.height, scroll));
             bar.y = scrollBarY - scrollBarHeight/2 + scroll;
             const scrollPercent = scroll / (scrollBarHeight - bar.height);
@@ -305,6 +393,26 @@ export function showAchievements(scene, getProgress) {
     });
     // Back button
     scene.createDynamicButton(725, 800, 'BACK TO MENU', '#ff4466', '#ff6688', () => {
-        scene.createDynamicMenu();
+        // Switch back to the main menu scene
+        if (scene.scene && typeof scene.scene.start === 'function') {
+            scene.scene.start('MainMenu');
+        }
     });
 }
+
+// Utility: Get the 3 closest-to-complete achievements (not yet completed)
+export function getClosestAchievements(getProgress = window.getProgress, count = 3) {
+    // Only consider achievements with progress < goal
+    const incomplete = ACHIEVEMENTS.filter(ach => {
+        const progress = getProgress(ach);
+        return progress < ach.goal;
+    });
+    // Sort by percent complete, descending
+    incomplete.sort((a, b) => {
+        const pa = getProgress(a) / a.goal;
+        const pb = getProgress(b) / b.goal;
+        return pb - pa;
+    });
+    return incomplete.slice(0, count);
+}
+// Removed stray scene.createDynamicMenu(); that caused ReferenceError

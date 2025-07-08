@@ -50,17 +50,21 @@ export function showPlayerSelect(scene, characters, onSelect) {
         let sprite;
         let locked = false;
         if (char.key === 'cat') {
-            locked = !catsbyUnlocked;
+            // Unlock CATsby by playing any level of Catsby's Corner
+            const catsbyCornerPlayed = parseInt(localStorage.getItem('catsbyCorner_highLevel') || '0', 10);
+            locked = catsbyCornerPlayed < 1;
         } else if (char.key === 'robot') {
-            locked = !teknoUnlocked;
+            // Unlock Tekno by reaching level 5 on Tekno's Terminal
+            const robotMapLevel = parseInt(localStorage.getItem('robotMap_highLevel') || '0', 10);
+            locked = robotMapLevel < 5;
         } else if (char.key === 'zarazombie') {
-            // Lock Gabbie until Pluto reaches level 20 on Gabbie's Grave
+            // Unlock Gabbie (Zara) by reaching level 15 on Gabbie's Grave with Pluto
             const plutoGabbieLevel = parseInt(localStorage.getItem('pluto_gabbiesGrave_highLevel') || '0', 10);
-            locked = plutoGabbieLevel < 20;
+            locked = plutoGabbieLevel < 15;
         } else if (char.key === 'pluto') {
-            // Lock Pluto until Gabbie's Grave is played at least once
-            const gabbiesGravePlayed = parseInt(localStorage.getItem('gabbiesGravePlayed') || '0', 10);
-            locked = gabbiesGravePlayed < 1;
+            // Unlock Pluto by reaching level 2 on Gabbie's Grave
+            const plutoLevel = parseInt(localStorage.getItem('gabbiesGrave_highLevel') || '0', 10);
+            locked = plutoLevel < 2;
         } else if (char.key !== 'dude' && !char.isRandom) {
             locked = true;
         }
@@ -80,9 +84,9 @@ export function showPlayerSelect(scene, characters, onSelect) {
                 .setDepth(101)
                 .setInteractive({ useHandCursor: true });
         } else if (char.key === 'pete') {
-            // Lock Pete until Catsby reaches level 10 on Pete's Street
-            const catsbyPeteLevel = parseInt(localStorage.getItem('cat_peteStreet_highLevel') || '0', 10);
-            locked = catsbyPeteLevel < 10;
+            // Unlock Pete by playing CATsby on Pete's Street
+            const catsbyOnPeteStreet = parseInt(localStorage.getItem('cat_peteStreet_highLevel') || '0', 10);
+            locked = catsbyOnPeteStreet < 1;
             // Pete: use sprite sheet for preview, not image
             let spriteX = x;
             let scale = 0.12 * 1.7;
@@ -114,15 +118,15 @@ export function showPlayerSelect(scene, characters, onSelect) {
             // Show unlock message above the lock for all locked characters
             let unlockMsg = '';
             if (char.key === 'pluto') {
-                unlockMsg = "Complete any level of Gabbie's Grave to unlock Pluto.";
+                unlockMsg = "Reach level 2 on Gabbie's Grave to unlock Pluto.";
             } else if (char.key === 'zarazombie') {
-                unlockMsg = "Complete any level of Pete's Street to unlock Gabbie.";
+                unlockMsg = "Reach level 15 on Gabbie's Grave with Pluto to unlock Gabbie.";
             } else if (char.key === 'cat') {
-                unlockMsg = "Complete any level of Catsby's Corner to unlock Cat.";
+                unlockMsg = "Play any level of Catsby's Corner to unlock CATsby.";
             } else if (char.key === 'robot') {
-                unlockMsg = "Complete any level of Tekno's Robot Map to unlock Tekno.";
+                unlockMsg = "Reach level 5 on Tekno's Terminal to unlock Tekno.";
             } else if (char.key === 'pete') {
-                unlockMsg = "Win on every map to unlock Pete!";
+                unlockMsg = "Play CATsby on Pete's Street to unlock Pete.";
             } else if (char.key === 'dude') {
                 unlockMsg = "Always unlocked.";
             } else if (char.isRandom) {

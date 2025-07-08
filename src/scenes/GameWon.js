@@ -1,3 +1,4 @@
+import { getClosestAchievements } from '../ui/achievements.js';
 // GameWon.js
 // Scene for when the player wins the game (reaches level 40)
 
@@ -66,9 +67,23 @@ export class GameWon extends Phaser.Scene {
                 }).setOrigin(0.5);
             });
         } else {
-            this.add.text(725, 390, 'No achievements earned this run.', {
-                fontFamily: 'Arial', fontSize: 28, color: '#fff', stroke: '#000', strokeThickness: 3
-            }).setOrigin(0.5);
+            // Show 3 closest achievements if none earned
+            const closest = getClosestAchievements();
+            if (closest.length > 0) {
+                this.add.text(725, 390, 'Closest Achievements:', {
+                    fontFamily: 'Arial', fontSize: 28, color: '#fff', stroke: '#000', strokeThickness: 3
+                }).setOrigin(0.5);
+                closest.forEach((ach, i) => {
+                    const progress = window.getProgress(ach);
+                    this.add.text(725, 430 + i * 36, `• ${ach.name} (${progress}/${ach.goal})`, {
+                        fontFamily: 'Arial', fontSize: 24, color: '#cccccc', stroke: '#000', strokeThickness: 2
+                    }).setOrigin(0.5);
+                });
+            } else {
+                this.add.text(725, 390, 'No achievements earned this run.', {
+                    fontFamily: 'Arial', fontSize: 28, color: '#fff', stroke: '#000', strokeThickness: 3
+                }).setOrigin(0.5);
+            }
         }
 
         // Showcase unlocked character or map
@@ -106,6 +121,12 @@ export class GameWon extends Phaser.Scene {
                     let mapPreviewKey = unlock.previewKey || unlock.key;
                     if (unlock.key === 'catsbyCorner' || unlock.label === "Catsby's Corner") {
                         mapPreviewKey = 'catBackground';
+                    } else if (unlock.key === 'robotMap' || unlock.label === "Tekno's Robot Map") {
+                        mapPreviewKey = 'robotMap';
+                    } else if (unlock.key === 'gabbiesGrave' || unlock.label === "Gabbie's Grave") {
+                        mapPreviewKey = 'zara background';
+                    } else if (unlock.key === 'peteStreet' || unlock.label === "Pete's Street") {
+                        mapPreviewKey = 'petesMap';
                     }
                     this.add.image(x, showcaseY + 40, mapPreviewKey)
                         .setDisplaySize(320, 180).setOrigin(0.5).setDepth(10);
