@@ -350,14 +350,24 @@ export function showAchievements(scene, getProgress) {
     const scrollBarX = 1200;
     // Thicker scroll bar for mobile and desktop thumb usability
     const isMobile = window.innerWidth <= 768 || window.innerHeight <= 768 || ('ontouchstart' in window || navigator.maxTouchPoints > 0);
-    const barWidth = isMobile ? 48 : 32;
-    const barThumbHeight = isMobile ? 120 : 90;
+    const barWidth = isMobile ? 80 : 56;
+    const barThumbHeight = isMobile ? 200 : 150;
     const barBg = scene.add.rectangle(scrollBarX, scrollBarY, barWidth, scrollBarHeight, 0x333300, 0.7);
-    const bar = scene.add.rectangle(scrollBarX, scrollBarY - scrollBarHeight/2 + 40, barWidth, barThumbHeight, 0xffcc00, 0.95).setInteractive();
+    const bar = scene.add.rectangle(scrollBarX, scrollBarY - scrollBarHeight/2 + 40, barWidth, barThumbHeight, 0xffcc00, 0.95).setInteractive({ draggable: true });
     bar.setOrigin(0.5, 0);
     let dragging = false;
     let dragOffsetY = 0;
     bar.on('pointerdown', (pointer) => { dragging = true; dragOffsetY = pointer.y - bar.y; });
+    bar.on('drag', (pointer, dragX, dragY) => {
+        if (dragging) {
+            let newY = pointer.y - dragOffsetY;
+            newY = Math.max(scrollBarY - scrollBarHeight/2, Math.min(scrollBarY + scrollBarHeight/2 - bar.height, newY));
+            bar.y = newY;
+            const scrollPercent = (bar.y - (scrollBarY - scrollBarHeight/2)) / (scrollBarHeight - bar.height);
+            const maxScroll = Math.max(0, y - 540);
+            textContainer.y = 205 - scrollPercent * maxScroll;
+        }
+    });
     scene.input.on('pointerup', () => { dragging = false; });
     scene.input.on('pointermove', (pointer) => {
         if (dragging) {

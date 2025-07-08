@@ -1049,11 +1049,28 @@ export class MainMenu extends Phaser.Scene {
         const scrollBarY = 475;
         const scrollBarX = 1200;
         // Thicker scroll bar for mobile and desktop thumb usability
-        const barWidth = this.isMobile ? 64 : 40;
-        const barThumbHeight = this.isMobile ? 140 : 110;
+        const barWidth = this.isMobile ? 80 : 56;
+        const barThumbHeight = this.isMobile ? 200 : 150;
         const barBg = this.add.rectangle(scrollBarX, scrollBarY, barWidth, scrollBarHeight, 0x003322, 0.7);
-        const bar = this.add.rectangle(scrollBarX, scrollBarY - scrollBarHeight/2 + 40, barWidth, barThumbHeight, 0x44ff66, 0.95).setInteractive();
+        const bar = this.add.rectangle(scrollBarX, scrollBarY - scrollBarHeight/2 + 40, barWidth, barThumbHeight, 0x44ff66, 0.95).setInteractive({ draggable: true });
         bar.setOrigin(0.5, 0);
+
+        // Make the bar draggable by pointerdown and drag events (for both mouse and touch)
+        bar.on('pointerdown', (pointer) => {
+            dragging = true;
+            dragOffsetY = pointer.y - bar.y;
+        });
+        bar.on('drag', (pointer, dragX, dragY) => {
+            if (dragging) {
+                let newY = pointer.y - dragOffsetY;
+                newY = Math.max(scrollBarY - scrollBarHeight/2, Math.min(scrollBarY + scrollBarHeight/2 - bar.height, newY));
+                bar.y = newY;
+                // Scroll text
+                const scrollPercent = (bar.y - (scrollBarY - scrollBarHeight/2)) / (scrollBarHeight - bar.height);
+                const maxScroll = Math.max(0, y - 540);
+                textContainer.y = 205 - scrollPercent * maxScroll;
+            }
+        });
 
         // Scroll logic
         let dragging = false;
